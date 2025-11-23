@@ -1,3 +1,21 @@
+---
+# inventory.ini
+# Save this as inventory.ini in the same directory
+#
+# [masters]
+# master1 ansible_host=192.168.1.10 ansible_user=ubuntu
+# master2 ansible_host=192.168.1.11 ansible_user=ubuntu
+# master3 ansible_host=192.168.1.12 ansible_user=ubuntu
+#
+# [workers]
+# worker1 ansible_host=192.168.1.20 ansible_user=ubuntu
+# worker2 ansible_host=192.168.1.21 ansible_user=ubuntu
+# worker3 ansible_host=192.168.1.22 ansible_user=ubuntu
+#
+# [k8s_cluster:children]
+# masters
+# workers
+
 - name: Deploy MicroK8s Cluster on Debian
   hosts: k8s_cluster
   become: yes
@@ -16,25 +34,13 @@
     - name: Install Python3 and dependencies (raw command, no Python required)
       raw: |
         apt-get update
-        apt-get install -y python3 python3-apt python3-pip
-        python3 -m pip install --upgrade pip setuptools
+        apt-get install -y python3 python3-apt
       changed_when: false
       tags: bootstrap
 
     - name: Wait for system to settle
       raw: sleep 2
       changed_when: false
-      tags: bootstrap
-
-    - name: Test Python availability
-      raw: python3 --version
-      register: python_version
-      changed_when: false
-      tags: bootstrap
-
-    - name: Display Python version
-      debug:
-        msg: "{{ python_version.stdout_lines }}"
       tags: bootstrap
 
     - name: Gather facts after Python installation
@@ -304,3 +310,4 @@
         var: cluster_nodes.stdout_lines
       when: inventory_hostname == primary_master
       tags: verify
+      
