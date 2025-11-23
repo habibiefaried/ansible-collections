@@ -1,174 +1,179 @@
----
-- name: Deploy RKE2 Cluster (3 Masters, 3 Workers)
-  hosts: all
+- name: Deploy RKE2 Cluster (3 masters + 3 workers)
+  hosts: k8s_cluster
   become: yes
   gather_facts: no
 
   vars:
     rke2_version: "v1.34.1+rke2r1"
-    rke2_server_config_dir: "/etc/rancher/rke2"
-    rke2_server_config: "/etc/rancher/rke2/config.yaml"
-    rke2_agent_config: "/etc/rancher/rke2/config.yaml"
-    rke2_token_file: "/var/lib/rancher/rke2/server/token"
+    rke2_server_config_path: "/etc/rancher/rke2/config.yaml"
+    rke2_agent_config_path: "/etc/rancher/rke2/config.yaml"
+    master0: "{{ groups['masters'][0] }}"
 
   tasks:
-    ###########################################################################
-    # 0. ENSURE PYTHON EXISTS (BECAUSE gather_facts IS DISABLED)
-    ###########################################################################
-    - name: Ensure Python is installed
+    # --------------------------------------------------------------------------
+    # 0. Bootstrap Python
+    # --------------------------------------------------------------------------
+    - name: Bootstrap Python if missing
       raw: |
         if ! command -v python3 >/dev/null 2>&1; then
-            apt-get update -y && apt-get install -y python3
+          apt-get update && apt-get install -y python3 python3-apt
         fi
       changed_when: false
 
-    ###########################################################################
-    # 1. CHECK IF RKE2 IS INSTALLED
-    ###########################################################################
-    - name: Check if RKE2 server binary exists
-      stat:
-        path: /usr/local/bin/rke2-server
-      register: rke2_server_bin
-      when: "'masters' in group_names"
+    - name: Wait after Python setup
+      raw: sleep 2
+      changed_when: false
 
-    - name: Check if RKE2 agent binary exists
-      stat:
-        path: /usr/local/bin/rke2-agent
-      register: rke2_agent_bin
-      when: "'workers' in group_names"
+    - name: Gather facts now that python exists
+      setup:
 
-    ###########################################################################
-    # 2. DOWNLOAD INSTALL SCRIPT IF MISSING
-    ###########################################################################
-    - name: Download RKE2 install script
+    # --------------------------------------------------------------------------
+    # 1. Install system dependencies
+    # --------------------------------------------------------------------------
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - wget
+          - python3
+          - python3-pip
+          - ca-certificates
+          - apt-transport-https
+        state: present
+        update_cache: yes
+
+    # --------------------------------------------------------------------------
+    # 2. Install RKE2
+    # --------------------------------------------------------------------------
+    - name: Check if RKE2 is installed
+      stat:
+        path: /usr/local/bin/rke2
+      register: rke2_installed
+
+    - name: Download RKE2 installer
       get_url:
         url: https://get.rke2.io
         dest: /tmp/rke2-install.sh
-        mode: '0755'
-      when: >
-        ('masters' in group_names and not rke2_server_bin.stat.exists) or
-        ('workers' in group_names and not rke2_agent_bin.stat.exists)
+        mode: "0755"
+      when: not rke2_installed.stat.exists
 
-    ###########################################################################
-    # 3. INSTALL RKE2 SERVER OR AGENT
-    ###########################################################################
-    - name: Install RKE2 server
+    - name: Install RKE2
       command: "sh /tmp/rke2-install.sh"
       environment:
         INSTALL_RKE2_VERSION: "{{ rke2_version }}"
-      register: install_rke2_server
-      when: "'masters' in group_names and not rke2_server_bin.stat.exists"
-
-    - name: Install RKE2 agent
-      command: "sh /tmp/rke2-install.sh"
-      environment:
-        INSTALL_RKE2_VERSION: "{{ rke2_version }}"
-      register: install_rke2_agent
-      when: "'workers' in group_names and not rke2_agent_bin.stat.exists"
+      when: not rke2_installed.stat.exists
+      register: rke2_install_output
 
     - debug:
-        var: install_rke2_agent
-      when: "'workers' in group_names and not rke2_agent_bin.stat.exists"
+        var: rke2_install_output
+      when: not rke2_installed.stat.exists
 
-    ###########################################################################
-    # 4. CONFIGURE MASTER NODES
-    ###########################################################################
-    - name: Create RKE2 server config dir
-      file:
-        path: "{{ rke2_server_config_dir }}"
-        state: directory
-        mode: '0755'
-      when: "'masters' in group_names"
-
-    - name: Generate RKE2 server config
+    # --------------------------------------------------------------------------
+    # 3. Prepare MASTER0 configuration
+    # --------------------------------------------------------------------------
+    - name: Generate RKE2 master0 server config
       copy:
-        dest: "{{ rke2_server_config }}"
+        dest: "{{ rke2_server_config_path }}"
+        mode: "0600"
         content: |
-          token: "{{ hostvars[groups['masters'][0]].cluster_token }}"
-          tls-san:
-            - "{{ groups['masters'][0] }}"
+          token: "server-bootstrap"
           node-name: "{{ inventory_hostname }}"
-          cluster-cidr: "10.42.0.0/16"
-          service-cidr: "10.43.0.0/16"
+          tls-san:
+            - "{{ ansible_host }}"
           write-kubeconfig-mode: "0644"
-      when: "'masters' in group_names"
+      when: inventory_hostname == master0
 
-    ###########################################################################
-    # 5. IF FIRST MASTER: CREATE TOKEN
-    ###########################################################################
-    - name: Check if cluster token file exists
-      stat:
-        path: "{{ rke2_token_file }}"
-      register: token_file_stat
-      when: inventory_hostname == groups['masters'][0]
-
-    - name: Create cluster token (first master only)
-      command: "rke2 token generate"
-      register: token_output
-      when: inventory_hostname == groups['masters'][0] and not token_file_stat.stat.exists
-
-    - name: Save cluster token to file
-      copy:
-        dest: "{{ rke2_token_file }}"
-        mode: '0600'
-        content: "{{ token_output.stdout }}"
-      when: inventory_hostname == groups['masters'][0] and not token_file_stat.stat.exists
-
-    - name: Load cluster token
-      slurp:
-        src: "{{ rke2_token_file }}"
-      register: slurped_token
-      when: inventory_hostname == groups['masters'][0]
-
-    - name: Share token
-      set_fact:
-        cluster_token: "{{ slurped_token.content | b64decode | trim }}"
-      when: inventory_hostname == groups['masters'][0]
-
-    ###########################################################################
-    # 6. START MASTER SERVICES
-    ###########################################################################
-    - name: Enable / start rke2-server
+    - name: Enable and start rke2-server on master0
       systemd:
         name: rke2-server
         state: started
         enabled: yes
-      when: "'masters' in group_names"
+      when: inventory_hostname == master0
 
-    ###########################################################################
-    # 7. CONFIGURE WORKER NODES
-    ###########################################################################
-    - name: Create RKE2 agent config dir
-      file:
-        path: "{{ rke2_server_config_dir }}"
-        state: directory
-        mode: '0755'
-      when: "'workers' in group_names"
+    - name: Wait for token file to appear (master0)
+      wait_for:
+        path: /var/lib/rancher/rke2/server/token
+        state: present
+        timeout: 120
+      when: inventory_hostname == master0
 
+    - name: Read master0 real token
+      slurp:
+        src: /var/lib/rancher/rke2/server/token
+      register: raw_token
+      when: inventory_hostname == master0
+
+    - name: Decode token
+      set_fact:
+        cluster_token: "{{ raw_token.content | b64decode | trim }}"
+      when: inventory_hostname == master0
+
+    - debug:
+        var: cluster_token
+      when: inventory_hostname == master0
+
+    # --------------------------------------------------------------------------
+    # 4. Share token with all nodes
+    # --------------------------------------------------------------------------
+    - name: Share token to all hosts
+      set_fact:
+        shared_token: "{{ hostvars[master0].cluster_token }}"
+      when: hostvars[master0].cluster_token is defined
+
+    - debug:
+        msg: "Node {{ inventory_hostname }} received token {{ shared_token }}"
+
+    # --------------------------------------------------------------------------
+    # 5. Configure remaining masters
+    # --------------------------------------------------------------------------
+    - name: Generate RKE2 server config for other masters
+      copy:
+        dest: "{{ rke2_server_config_path }}"
+        mode: "0600"
+        content: |
+          token: "{{ shared_token }}"
+          server: https://{{ hostvars[master0].ansible_host }}:9345
+          node-name: "{{ inventory_hostname }}"
+          tls-san:
+            - "{{ ansible_host }}"
+          write-kubeconfig-mode: "0644"
+      when: inventory_hostname in groups['masters'] and inventory_hostname != master0
+
+    - name: Enable & start rke2-server (other masters)
+      systemd:
+        name: rke2-server
+        state: started
+        enabled: yes
+      when: inventory_hostname in groups['masters'] and inventory_hostname != master0
+
+    # --------------------------------------------------------------------------
+    # 6. Configure workers
+    # --------------------------------------------------------------------------
     - name: Generate RKE2 agent config
       copy:
-        dest: "{{ rke2_agent_config }}"
+        dest: "{{ rke2_agent_config_path }}"
+        mode: "0600"
         content: |
-          server: "https://{{ hostvars[groups['masters'][0]].ansible_host }}:9345"
-          token: "{{ hostvars[groups['masters'][0]].cluster_token }}"
+          server: https://{{ hostvars[master0].ansible_host }}:9345
+          token: "{{ shared_token }}"
           node-name: "{{ inventory_hostname }}"
-      when: "'workers' in group_names"
+      when: inventory_hostname in groups['workers']
 
-    ###########################################################################
-    # 8. START WORKER SERVICE
-    ###########################################################################
-    - name: Enable / start rke2-agent
+    - name: Enable & start rke2-agent
       systemd:
         name: rke2-agent
         state: started
         enabled: yes
-      when: "'workers' in group_names"
+      when: inventory_hostname in groups['workers']
 
-    ###########################################################################
-    # 9. DEBUG OUTPUT
-    ###########################################################################
-    - name: Debug installed binaries
-      debug:
-        msg: |
-          SERVER BINARY EXISTS: {{ rke2_server_bin.stat.exists | default('N/A') }}
-          AGENT BINARY EXISTS: {{ rke2_agent_bin.stat.exists | default('N/A') }}
+    # --------------------------------------------------------------------------
+    # 7. Final cluster verification (master0)
+    # --------------------------------------------------------------------------
+    - name: Verify cluster
+      shell: /var/lib/rancher/rke2/bin/kubectl get nodes -o wide
+      register: cluster_nodes
+      when: inventory_hostname == master0
+
+    - debug:
+        var: cluster_nodes.stdout
+      when: inventory_hostname == master0
