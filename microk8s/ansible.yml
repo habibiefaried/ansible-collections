@@ -293,13 +293,13 @@
     - name: Create kubectl alias
       lineinfile:
         path: "/home/{{ ansible_user }}/.bashrc"
-        line: "alias kubectl='microk8s kubectl'"
+        line: "alias kubectl='/snap/bin/microk8s kubectl'"
         create: yes
       tags: config
 
     # Phase 8: Verify cluster
     - name: Get cluster nodes
-      command: microk8s kubectl get nodes
+      shell: /snap/bin/microk8s kubectl get nodes
       when: inventory_hostname == primary_master
       register: cluster_nodes
       changed_when: false
