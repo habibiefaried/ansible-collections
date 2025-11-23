@@ -1,212 +1,400 @@
-- name: Deploy RKE2 Cluster (3 Masters + 3 Workers)
+---
+# deploy-rke2-full.yml
+# Single-file, ordered, idempotent RKE2 installer for 3 masters + 3 workers
+# Uses rke2 token generate (official CLI) and follows Quickstart ordering
+
+############################################################
+# PLAY 1: Bootstrap Python on all hosts (gather_facts: no)
+############################################################
+- name: Bootstrap Python on all nodes (raw, safe for fresh images)
   hosts: k8s_cluster
   become: yes
-  gather_facts: no    # Python may not exist yet; disable default facts
-
-  vars:
-    rke2_version: "v1.34.1+rke2r1"
-    rke2_config_path: "/etc/rancher/rke2/config.yaml"
-    master0: "{{ groups['masters'][0] }}"
-
-  handlers:
-    - name: reload sysctl
-      shell: sysctl --system
-
-    - name: reload modules
-      shell: modprobe br_netfilter && modprobe overlay
+  gather_facts: no
 
   tasks:
-    #######################################################################
-    # PHASE 0 — BOOTSTRAP PYTHON (raw mode, idempotent)
-    #######################################################################
-    - name: Bootstrap Python3 (raw, runs even without Python)
+    - name: Ensure python3 is present (raw so it works without Python)
       raw: |
         if ! command -v python3 >/dev/null 2>&1; then
-          apt-get update && apt-get install -y python3 python3-apt
+          apt-get update -y
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-apt
         fi
       changed_when: false
       tags: bootstrap
 
-    - name: Wait after Python install
+    - name: Wait a moment after bootstrap
       raw: sleep 2
       changed_when: false
       tags: bootstrap
 
-    - name: Gather Ansible facts AFTER Python exists
+    - name: Gather facts after bootstrap
       setup:
       tags: bootstrap
 
-    #######################################################################
-    # PHASE 1 — PREPARE NODES
-    #######################################################################
+############################################################
+# PLAY 2: Prepare system on all nodes (packages, sysctl, modules)
+############################################################
+- name: Prepare nodes (packages, kernel modules, sysctl)
+  hosts: k8s_cluster
+  become: yes
+  gather_facts: yes
+
+  vars:
+    rke2_version: "v1.34.1+rke2r1"
+    rke2_install_script_url: "https://get.rke2.io"
+
+  tasks:
     - name: Update apt cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
-      tags: prepare
 
-    - name: Install required system packages
+    - name: Install required packages
       apt:
         name:
-          - python3
-          - python3-pip
           - curl
           - wget
+          - tar
           - ca-certificates
           - apt-transport-https
-          - tar
-          - snapd
+          - conntrack
+          - socat
+          - ipset
+          - jq
         state: present
-      tags: prepare
+        update_cache: yes
 
-    #######################################################################
-    # COMMON SYSTEM SETUP
-    #######################################################################
-    - name: Enable kernel modules for Kubernetes
+    - name: Ensure /etc/modules-load.d/rke2.conf exists (br_netfilter, overlay)
       copy:
         dest: /etc/modules-load.d/rke2.conf
         content: |
           br_netfilter
           overlay
-      notify: reload modules
+        mode: '0644'
+      notify: reload-modules
 
-    - name: Configure sysctl requirements
+    - name: Ensure sysctl settings for Kubernetes
       copy:
         dest: /etc/sysctl.d/90-rke2.conf
         content: |
           net.ipv4.ip_forward = 1
           net.bridge.bridge-nf-call-iptables = 1
           net.bridge.bridge-nf-call-ip6tables = 1
-      notify: reload sysctl
+        mode: '0644'
+      notify: reload-sysctls
 
-    #######################################################################
-    # INSTALL RKE2 (Idempotent)
-    #######################################################################
-    - name: Check if RKE2 binary exists
+    - name: Ensure conntrack module is loaded (best-effort)
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Check if rke2 binary exists
       stat:
         path: /usr/local/bin/rke2
-      register: rke2_installed
+      register: rke2_binary
 
-    - name: Download RKE2 install script
+    - name: Download rke2 install script (only if binary missing)
+      get_url:
+        url: "{{ rke2_install_script_url }}"
+        dest: /tmp/rke2-install.sh
+        mode: '0755'
+      when: not rke2_binary.stat.exists
+
+  handlers:
+    - name: reload-modules
+      become: yes
+      shell: modprobe br_netfilter || true
+      listen: reload-modules
+
+    - name: reload-sysctls
+      become: yes
+      shell: sysctl --system
+      listen: reload-sysctls
+
+############################################################
+# PLAY 3: Install and start master0 (first server), generate token
+############################################################
+- name: Install and start master0 server, generate cluster token
+  hosts: "{{ groups['masters'][0] }}"
+  become: yes
+  gather_facts: yes
+
+  vars:
+    rke2_version: "v1.34.1+rke2r1"
+    rke2_install_script: /tmp/rke2-install.sh
+    rke2_bin_path: /var/lib/rancher/rke2/bin/rke2
+    rke2_service: rke2-server
+
+  tasks:
+    - name: Ensure installer script exists (download if missing)
       get_url:
         url: https://get.rke2.io
         dest: /tmp/rke2-install.sh
         mode: '0755'
-      when: not rke2_installed.stat.exists
+      when: not (rke2_install_script is defined)
 
-    - name: Install RKE2
-      shell: INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh
-      when: not rke2_installed.stat.exists
-      register: rke2_install_result
+    - name: Check if rke2-server already installed (binary path)
+      stat:
+        path: "{{ rke2_bin_path }}"
+      register: rke2_server_stat
 
-    - debug:
-        var: rke2_install_result
-      when: not rke2_installed.stat.exists
+    - name: Install rke2 server (if not installed)
+      shell: |
+        INSTALL_RKE2_TYPE=server INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh
+      args:
+        warn: false
+      when: not rke2_server_stat.stat.exists
+      register: rke2_server_install
+    - name: Debug server install result
+      debug:
+        var: rke2_server_install
+      when: rke2_server_install is defined
 
-    #######################################################################
-    # MASTER 0 — READ OR WAIT FOR TOKEN
-    #######################################################################
-    - name: Wait for token to exist (master0)
-      wait_for:
-        path: /var/lib/rancher/rke2/server/token
-        state: present
-      when: inventory_hostname == master0
+    - name: Ensure /etc/rancher/rke2 exists
+      file:
+        path: /etc/rancher/rke2
+        state: directory
+        mode: '0755'
 
-    - name: Read cluster token
-      slurp:
-        src: /var/lib/rancher/rke2/server/token
-      register: slurped_token
-      when: inventory_hostname == master0
-
-    - name: Set cluster_token fact (master0)
-      set_fact:
-        cluster_token: "{{ slurped_token.content | b64decode | trim }}"
-      when: inventory_hostname == master0
-
-    #######################################################################
-    # SHARE TOKEN TO ALL NODES
-    #######################################################################
-    - name: Propagate token to all hosts
-      add_host:
-        name: "{{ item }}"
-        cluster_token: "{{ hostvars[master0].cluster_token }}"
-      loop: "{{ groups['k8s_cluster'] }}"
-      when: inventory_hostname == master0
-
-    #######################################################################
-    # MASTER CONFIGURATION
-    #######################################################################
-    - name: Create RKE2 server config (masters)
+    - name: Create minimal server config for master0 (idempotent)
       copy:
-        dest: "{{ rke2_config_path }}"
+        dest: /etc/rancher/rke2/config.yaml
         mode: '0600'
         content: |
-          server: https://{{ hostvars[master0].ansible_host }}:9345
-          token: "{{ hostvars[master0].cluster_token }}"
-          node-name: "{{ inventory_hostname }}"
-          tls-san:
-            - "{{ hostvars[inventory_hostname].ansible_host }}"
-          disable:
-            - rke2-ingress-nginx
           write-kubeconfig-mode: "0644"
-      when: inventory_hostname in groups['masters']
+          node-name: "{{ inventory_hostname }}"
+      register: master0_server_config
 
-    - name: Enable + start rke2-server
+    - name: Start and enable rke2-server
+      systemd:
+        name: "{{ rke2_service }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      register: master0_service_start
+      retries: 6
+      delay: 5
+      until: master0_service_start is succeeded
+
+    - name: Wait for rke2 server kubeconfig to appear
+      wait_for:
+        path: /etc/rancher/rke2/rke2.yaml
+        timeout: 180
+
+    - name: Wait for API to be responsive on master0 (kubectl get nodes)
+      shell: /var/lib/rancher/rke2/bin/kubectl get nodes
+      register: master0_kubectl
+      retries: 12
+      delay: 10
+      until: master0_kubectl.rc == 0
+      failed_when: false
+
+    - name: Debug master0 kubectl check
+      debug:
+        var: master0_kubectl
+
+    - name: Generate bootstrap token (rke2 token generate)
+      shell: /var/lib/rancher/rke2/bin/rke2 token generate
+      register: generated_token
+      changed_when: false
+
+    - name: Set cluster_token fact on master0
+      set_fact:
+        cluster_token: "{{ generated_token.stdout | trim }}"
+
+    - name: Debug generated token
+      debug:
+        msg: "Generated cluster token on master0: {{ cluster_token }}"
+
+    # Make token available to the controller & later plays via add_host (once)
+    - name: Add token host with token fact (so other plays can reference it)
+      add_host:
+        name: rke2_token_holder
+        cluster_token: "{{ cluster_token }}"
+        master0_addr: "{{ ansible_host | default(inventory_hostname) }}"
+      run_once: true
+
+############################################################
+# PLAY 4: Install and join other masters (as servers)
+############################################################
+- name: Install and join other masters to the cluster (servers)
+  hosts: masters
+  become: yes
+  gather_facts: yes
+
+  vars:
+    master0_host: "{{ groups['masters'][0] }}"
+    rke2_bin_path: /var/lib/rancher/rke2/bin/rke2
+    rke2_service: rke2-server
+
+  tasks:
+    - name: Skip primary master (already configured)
+      meta: end_host
+      when: inventory_hostname == master0_host
+
+    - name: Check if rke2 server binary exists on joining master
+      stat:
+        path: "{{ rke2_bin_path }}"
+      register: join_rke2_stat
+
+    - name: Install rke2 server on joining master if needed
+      shell: |
+        INSTALL_RKE2_TYPE=server INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh
+      args:
+        warn: false
+      when: not join_rke2_stat.stat.exists
+      register: join_install_result
+
+    - name: Debug join install result
+      debug:
+        var: join_install_result
+      when: join_install_result is defined
+
+    - name: Ensure /etc/rancher/rke2 exists on joining master
+      file:
+        path: /etc/rancher/rke2
+        state: directory
+        mode: '0755'
+
+    - name: Create server config to join primary (on joining master)
+      copy:
+        dest: /etc/rancher/rke2/config.yaml
+        mode: '0600'
+        content: |
+          server: https://{{ hostvars['rke2_token_holder'].master0_addr }}:9345
+          token: "{{ hostvars['rke2_token_holder'].cluster_token }}"
+          node-name: "{{ inventory_hostname }}"
+          write-kubeconfig-mode: "0644"
+      notify: restart-rke2-server
+
+    - name: Start and enable rke2-server on joining master
+      systemd:
+        name: "{{ rke2_service }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      register: join_server_start
+      retries: 6
+      delay: 5
+      until: join_server_start is succeeded
+
+    - name: Wait for node to register in cluster (kubectl on master0)
+      delegate_to: "{{ groups['masters'][0] }}"
+      shell: /var/lib/rancher/rke2/bin/kubectl get nodes -o wide
+      register: nodes_after_join
+      retries: 10
+      delay: 8
+      until: nodes_after_join.rc == 0
+      failed_when: false
+
+    - name: Debug nodes after join
+      debug:
+        var: nodes_after_join
+
+  handlers:
+    - name: restart-rke2-server
       systemd:
         name: rke2-server
-        enabled: yes
-        state: started
-      when: inventory_hostname in groups['masters']
+        state: restarted
+        daemon_reload: yes
 
-    - name: Wait until API server responds
-      shell: /var/lib/rancher/rke2/bin/kubectl get nodes
-      register: api_check
-      retries: 20
-      delay: 10
-      failed_when: false
-      when: inventory_hostname in groups['masters']
+############################################################
+# PLAY 5: Install and join workers (agents)
+############################################################
+- name: Install and join workers (agents)
+  hosts: workers
+  become: yes
+  gather_facts: yes
 
-    - debug:
-        var: api_check
-      when: inventory_hostname in groups['masters']
+  vars:
+    rke2_agent_bin: /var/lib/rancher/rke2/bin/rke2
+    rke2_agent_service: rke2-agent
 
-    #######################################################################
-    # WORKER CONFIGURATION
-    #######################################################################
-    - name: Create RKE2 agent config (workers)
+  tasks:
+    - name: Check if rke2 agent binary exists
+      stat:
+        path: "{{ rke2_agent_bin }}"
+      register: agent_bin
+
+    - name: Install rke2 agent if missing
+      shell: |
+        INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh
+      args:
+        warn: false
+      when: not agent_bin.stat.exists
+      register: agent_install_result
+
+    - name: Debug agent install result
+      debug:
+        var: agent_install_result
+      when: agent_install_result is defined
+
+    - name: Create agent config to connect to master0
       copy:
-        dest: "{{ rke2_config_path }}"
+        dest: /etc/rancher/rke2/config.yaml
         mode: '0600'
         content: |
-          server: https://{{ hostvars[master0].ansible_host }}:9345
-          token: "{{ hostvars[master0].cluster_token }}"
+          server: https://{{ hostvars['rke2_token_holder'].master0_addr }}:9345
+          token: "{{ hostvars['rke2_token_holder'].cluster_token }}"
           node-name: "{{ inventory_hostname }}"
-      when: inventory_hostname in groups['workers']
 
-    - name: Enable + start rke2-agent
+    - name: Start and enable rke2-agent
       systemd:
-        name: rke2-agent
+        name: "{{ rke2_agent_service }}"
         enabled: yes
         state: started
-      when: inventory_hostname in groups['workers']
+        daemon_reload: yes
+      register: agent_start
+      retries: 6
+      delay: 5
+      until: agent_start is succeeded
 
-    - name: Tail agent logs (debug)
-      shell: journalctl -u rke2-agent -n 20 --no-pager
+    - name: Tail agent logs (for quick debug)
+      shell: journalctl -u rke2-agent -n 50 --no-pager
       register: agent_logs
-      when: inventory_hostname in groups['workers']
+      failed_when: false
 
-    - debug:
-        var: agent_logs
-      when: inventory_hostname in groups['workers']
+    - name: Debug agent logs summary
+      debug:
+        msg: "{{ agent_logs.stdout_lines | slice(-10, 10) }}"
 
-    #######################################################################
-    # FINAL VERIFICATION (master0 only)
-    #######################################################################
-    - name: Get cluster nodes
-      shell: /var/lib/rancher/rke2/bin/kubectl get nodes -o wide
-      register: cluster_nodes
-      when: inventory_hostname == master0
+############################################################
+# PLAY 6: Final verification & kubeconfig fetch from master0
+############################################################
+- name: Verify cluster on master0 and fetch kubeconfig
+  hosts: "{{ groups['masters'][0] }}"
+  become: yes
+  gather_facts: no
 
-    - debug:
-        msg: "{{ cluster_nodes.stdout }}"
-      when: inventory_hostname == master0
+  tasks:
+    - name: Wait for kubeconfig on master0
+      wait_for:
+        path: /etc/rancher/rke2/rke2.yaml
+        timeout: 120
+
+    - name: Fetch kubeconfig to controller
+      fetch:
+        src: /etc/rancher/rke2/rke2.yaml
+        dest: "./rke2-kubeconfig-{{ inventory_hostname }}.yaml"
+        flat: yes
+
+    - name: Wait a short moment for cluster to settle
+      pause:
+        seconds: 10
+
+    - name: Show cluster nodes (kubectl)
+      shell: /var/lib/rancher/rke2/bin/kubectl --kubeconfig=/etc/rancher/rke2/rke2.yaml get nodes -o wide
+      register: final_nodes
+      retries: 8
+      delay: 6
+      until: final_nodes.rc == 0
+      failed_when: false
+
+    - name: Debug final nodes
+      debug:
+        var: final_nodes.stdout_lines
+
+    - name: Note kubeconfig path
+      debug:
+        msg: "Kubeconfig copied to ./rke2-kubeconfig-{{ inventory_hostname }}.yaml on controller"
+
+# End of playbook
