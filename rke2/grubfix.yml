@@ -1,0 +1,216 @@
+---
+# rke2-enable-cgroup-and-fix.yml
+# Purpose: Enable memory cgroup support via GRUB, reboot nodes (rolling), verify cgroup,
+# restart rke2 services and validate cluster. Idempotent and debug-friendly.
+
+- name: Enable memory cgroup, reboot nodes, restart RKE2, verify cluster
+  hosts: k8s_cluster
+  become: yes
+  gather_facts: no
+  serial: 1                      # rolling reboot one node at a time
+  vars:
+    grub_file: /etc/default/grub
+    grub_needed_flags: "systemd.unified_cgroup_hierarchy=1 cgroup_enable=memory swapaccount=1"
+    rke2_server_config: /etc/rancher/rke2/config.yaml
+    rke2_kubeconfig: /etc/rancher/rke2/rke2.yaml
+    primary_master: "{{ groups['masters'][0] }}"
+    wait_for_ssh_timeout: 600
+    verify_memory_timeout: 120
+
+  tasks:
+    - name: Bootstrap Python (raw) if missing
+      raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get update -y && apt-get install -y python3 python3-apt
+        fi
+      changed_when: false
+
+    - name: Gather facts now that Python exists
+      setup:
+
+    - name: Show current kernel cmdline (debug)
+      command: cat /proc/cmdline
+      register: kernel_cmdline
+    - debug: var=kernel_cmdline.stdout
+
+    - name: Ensure modules-load file exists for k8s (br_netfilter + overlay)
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          br_netfilter
+          overlay
+        mode: '0644'
+      notify: load kernel modules
+
+    - name: Ensure sysctl file for kubernetes present
+      copy:
+        dest: /etc/sysctl.d/90-rke2-cgroup.conf
+        content: |
+          net.ipv4.ip_forward = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.bridge.bridge-nf-call-iptables = 1
+        mode: '0644'
+      notify: reload sysctl
+
+    - name: Read current GRUB_CMDLINE_LINUX from /etc/default/grub
+      slurp:
+        src: "{{ grub_file }}"
+      register: grub_raw
+
+    - name: Decode current grub content (debug)
+      set_fact:
+        grub_content: "{{ grub_raw.content | b64decode }}"
+    - debug:
+        msg: "Current {{ grub_file }} content preview:\n{{ grub_content.splitlines() | join('\n') | truncate(400) }}"
+
+    - name: Ensure GRUB_CMDLINE_LINUX contains cgroup flags (idempotent)
+      lineinfile:
+        path: "{{ grub_file }}"
+        regexp: '^GRUB_CMDLINE_LINUX='
+        line: 'GRUB_CMDLINE_LINUX="{{ grub_needed_flags }} {{ (lookup("env","GRUB_CMDLINE_LINUX") | default("")) | trim }}"'
+        backrefs: yes
+      register: grub_patch_result
+
+    - name: Debug: grub update needed?
+      debug:
+        var: grub_patch_result
+
+    - name: Update grub (Debian/Ubuntu)
+      command: update-grub
+      when: grub_patch_result is changed
+
+    - name: Sync filesystem to flush grub
+      command: sync
+      when: grub_patch_result is changed
+
+    - name: Reboot node if grub changed
+      reboot:
+        reboot_timeout: 600
+      when: grub_patch_result is changed
+      register: reboot_result
+
+    - name: Wait for SSH after reboot (when reboot occurred)
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 22
+        state: started
+        timeout: "{{ wait_for_ssh_timeout }}"
+      when: grub_patch_result is changed
+
+    - name: Verify memory cgroup presence (cgroup v2 or v1)
+      block:
+        - name: Check for cgroup v2 memory controller files
+          shell: |
+            if [ -f /sys/fs/cgroup/memory.max ] || [ -f /sys/fs/cgroup/memory.current ] ; then
+              echo "ok"
+            else
+              # check for cgroup v2 memory files under unified
+              if ls /sys/fs/cgroup | grep -E '^memory' >/dev/null 2>&1; then
+                echo "ok"
+              else
+                echo "missing"
+              fi
+            fi
+          register: cgroup_memory_check
+          failed_when: false
+
+        - name: Debug cgroup memory check
+          debug:
+            msg: "cgroup memory check on {{ inventory_hostname }} -> {{ cgroup_memory_check.stdout }}"
+
+        - name: Fail if cgroup memory still missing
+          fail:
+            msg: >
+              Memory cgroup controller appears missing on {{ inventory_hostname }}.
+              Please ensure grub flags were applied and node was rebooted. See /proc/cmdline.
+          when: cgroup_memory_check.stdout.find('ok') == -1
+      rescue:
+        - name: Debug rescue - show /proc/cmdline
+          command: cat /proc/cmdline
+          register: rcmd
+        - debug:
+            var: rcmd.stdout
+        - fail:
+            msg: "Memory cgroup verification failed on {{ inventory_hostname }}; manual intervention required."
+
+    - name: Ensure /etc/rancher/rke2 exists (create if missing)
+      file:
+        path: /etc/rancher/rke2
+        state: directory
+        mode: '0755'
+
+    - name: Ensure RKE2 server config does NOT disable default Canal (if server)
+      when: inventory_hostname in groups['masters']
+      block:
+        - name: Read existing RKE2 config if present
+          stat:
+            path: "{{ rke2_server_config }}"
+          register: rke2_conf_stat
+
+        - name: Create minimal RKE2 server config (do not disable canal)
+          copy:
+            dest: "{{ rke2_server_config }}"
+            mode: '0600'
+            content: |
+              write-kubeconfig-mode: "0644"
+              node-name: "{{ inventory_hostname }}"
+          when: not rke2_conf_stat.stat.exists
+
+        - name: If config exists, ensure 'disable: rke2-canal' is not present (remove disable entries if any)
+          lineinfile:
+            path: "{{ rke2_server_config }}"
+            regexp: '^\s*disable:'
+            state: absent
+          when: rke2_conf_stat.stat.exists
+
+    - name: Restart rke2 service (server or agent) after cgroup fix
+      systemd:
+        name: "{{ 'rke2-server' if inventory_hostname in groups['masters'] else 'rke2-agent' }}"
+        state: restarted
+        enabled: yes
+      register: rke2_restart
+      failed_when: rke2_restart is failed
+
+    - name: Wait for rke2 kubeconfig (masters only)
+      wait_for:
+        path: "{{ rke2_kubeconfig }}"
+        timeout: 300
+      when: inventory_hostname == primary_master
+
+    - name: Wait for kube-apiserver to respond (masters only)
+      shell: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig={{ rke2_kubeconfig }} get nodes -o wide"
+      register: kube_check
+      retries: 12
+      delay: 10
+      until: kube_check.rc == 0
+      failed_when: false
+      when: inventory_hostname == primary_master
+
+    - name: Debug kube check (masters only)
+      debug:
+        var: kube_check.stdout_lines
+      when: inventory_hostname == primary_master
+
+    - name: Pause brief to let system pods schedule
+      pause:
+        seconds: 10
+
+    - name: Show kube-system pods (masters only)
+      shell: "/var/lib/rancher/rke2/bin/kubectl --kubeconfig={{ rke2_kubeconfig }} get pods -n kube-system -o wide"
+      register: ksys_pods
+      failed_when: false
+      when: inventory_hostname == primary_master
+
+    - name: Debug kube-system pods (masters only)
+      debug:
+        var: ksys_pods.stdout_lines
+      when: inventory_hostname == primary_master
+
+  handlers:
+    - name: load kernel modules
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: reload sysctl
+      command: sysctl --system
