@@ -238,14 +238,24 @@
 
     - name: Extract master join command
       set_fact:
-        master_join_token: "{{ master_join_command.stdout_lines | select('match', '.*microk8s join.*') | first }}"
-      when: inventory_hostname == primary_master
+        master_join_token: "{{ master_join_command.stdout_lines | select('match', '.*microk8s join.*') | reject('match', '.*--worker.*') | first | default('') }}"
+      when: 
+        - inventory_hostname == primary_master
+        - master_join_command.stdout_lines is defined
       tags: cluster
 
     - name: Display extracted master join token
       debug:
         var: master_join_token
       when: inventory_hostname == primary_master
+      tags: cluster
+
+    - name: Fail if master join token is empty
+      fail:
+        msg: "Failed to extract master join token from add-node output"
+      when: 
+        - inventory_hostname == primary_master
+        - master_join_token is not defined or master_join_token == ''
       tags: cluster
 
     - name: Generate join token for workers from primary master
@@ -255,9 +265,31 @@
       changed_when: false
       tags: cluster
 
-    - name: Extract worker join command
+    - name: Display worker join token generation
+      debug:
+        var: worker_join_command
+      when: inventory_hostname == primary_master
+      tags: cluster
+
+    - name: Extract worker join command with --worker flag
       set_fact:
-        worker_join_token: "{{ worker_join_command.stdout_lines | select('match', '.*microk8s join.*') | first }}"
+        worker_join_token: "{{ worker_join_command.stdout_lines | select('match', '.*microk8s join.*--worker') | first | default('') }}"
+      when: 
+        - inventory_hostname == primary_master
+        - worker_join_command.stdout_lines is defined
+      tags: cluster
+
+    - name: Fail if worker join token is empty
+      fail:
+        msg: "Failed to extract worker join token from add-node output"
+      when: 
+        - inventory_hostname == primary_master
+        - worker_join_token is not defined or worker_join_token == ''
+      tags: cluster
+
+    - name: Display extracted worker join token
+      debug:
+        var: worker_join_token
       when: inventory_hostname == primary_master
       tags: cluster
 
@@ -270,8 +302,16 @@
         - inventory_hostname != primary_master
       tags: cluster
 
+    - name: Display master join command that will be executed
+      debug:
+        msg: "Joining master node {{ inventory_hostname }} to cluster with command:\n{{ master_token | replace('microk8s', '/snap/bin/microk8s') }}"
+      when: 
+        - inventory_hostname in groups['masters']
+        - inventory_hostname != primary_master
+      tags: cluster
+
     - name: Join additional master nodes to cluster
-      command: "{{ master_token }}"
+      shell: "{{ master_token | replace('microk8s', '/snap/bin/microk8s') }}"
       when: 
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
@@ -280,11 +320,36 @@
       failed_when: false
       tags: cluster
 
+    - name: Display master join command output
+      debug:
+        msg: |
+          Master node {{ inventory_hostname }} join result:
+          Command: {{ master_token | replace('microk8s', '/snap/bin/microk8s') }}
+          Return code: {{ master_join_result.rc }}
+          Output:
+          {{ master_join_result.stdout }}
+          {% if master_join_result.stderr %}
+          Error output:
+          {{ master_join_result.stderr }}
+          {% endif %}
+      when: 
+        - inventory_hostname in groups['masters']
+        - inventory_hostname != primary_master
+      tags: cluster
+
     - name: Wait for additional masters to be ready
       shell: /snap/bin/microk8s status --wait-ready
       when: 
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
+      changed_when: false
+      retries: 10
+      delay: 10
+      tags: cluster
+
+    - name: Wait for all masters to stabilize on primary master
+      shell: /snap/bin/microk8s status --wait-ready
+      when: inventory_hostname == primary_master
       changed_when: false
       tags: cluster
 
@@ -295,12 +360,33 @@
       when: inventory_hostname in groups['workers']
       tags: cluster
 
+    - name: Display worker join command that will be executed
+      debug:
+        msg: "Joining worker node {{ inventory_hostname }} to cluster with command:\n{{ worker_token | replace('microk8s', '/snap/bin/microk8s') }}"
+      when: inventory_hostname in groups['workers']
+      tags: cluster
+
     - name: Join worker nodes to cluster
-      shell: "{{ worker_token }}"
+      shell: "{{ worker_token | replace('microk8s', '/snap/bin/microk8s') }}"
       when: inventory_hostname in groups['workers']
       register: worker_join_result
       changed_when: "'Successfully joined' in worker_join_result.stdout or worker_join_result.rc == 0"
       failed_when: false
+      tags: cluster
+
+    - name: Display worker join command output
+      debug:
+        msg: |
+          Worker node {{ inventory_hostname }} join result:
+          Command: {{ worker_token | replace('microk8s', '/snap/bin/microk8s') }}
+          Return code: {{ worker_join_result.rc }}
+          Output:
+          {{ worker_join_result.stdout }}
+          {% if worker_join_result.stderr %}
+          Error output:
+          {{ worker_join_result.stderr }}
+          {% endif %}
+      when: inventory_hostname in groups['workers']
       tags: cluster
 
     - name: Wait for worker nodes to be ready
@@ -333,7 +419,7 @@
 
     # Phase 8: Verify cluster
     - name: Get cluster nodes
-      shell: /snap/bin/microk8s kubectl get nodes
+      shell: /snap/bin/microk8s kubectl get nodes -o wide
       when: inventory_hostname == primary_master
       register: cluster_nodes
       changed_when: false
@@ -341,6 +427,15 @@
 
     - name: Display cluster status
       debug:
-        var: cluster_nodes.stdout_lines
+        msg: "Cluster nodes:\n{{ cluster_nodes.stdout }}"
+      when: inventory_hostname == primary_master
+      tags: verify
+
+    - name: Verify expected number of nodes
+      assert:
+        that:
+          - cluster_nodes.stdout_lines | length >= (groups['masters'] | length + groups['workers'] | length)
+        fail_msg: "Expected {{ groups['masters'] | length + groups['workers'] | length }} nodes ({{ groups['masters'] | length }} masters + {{ groups['workers'] | length }} workers), but found {{ cluster_nodes.stdout_lines | length - 1 }}"
+        success_msg: "Cluster has correct number of nodes"
       when: inventory_hostname == primary_master
       tags: verify
