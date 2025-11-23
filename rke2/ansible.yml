@@ -53,16 +53,16 @@
     # 3. INSTALL RKE2 SERVER OR AGENT
     ###########################################################################
     - name: Install RKE2 server
-      command: "INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh"
+      command: "sh /tmp/rke2-install.sh"
+      environment:
+        INSTALL_RKE2_VERSION: "{{ rke2_version }}"
       register: install_rke2_server
       when: "'masters' in group_names and not rke2_server_bin.stat.exists"
 
-    - debug:
-        var: install_rke2_server
-      when: "'masters' in group_names and not rke2_server_bin.stat.exists"
-
     - name: Install RKE2 agent
-      command: "INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh"
+      command: "sh /tmp/rke2-install.sh"
+      environment:
+        INSTALL_RKE2_VERSION: "{{ rke2_version }}"
       register: install_rke2_agent
       when: "'workers' in group_names and not rke2_agent_bin.stat.exists"
 
