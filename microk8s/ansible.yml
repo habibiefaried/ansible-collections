@@ -222,82 +222,83 @@
       changed_when: false
       tags: configure
 
-    # Phase 4: Generate join tokens
-    - name: Generate join token for additional masters
+    ###########################################################################
+    # PHASE 4 — FIXED: Per-node join tokens
+    ###########################################################################
+
+    # Generate one add-node output per master (except primary)
+    - name: Generate per-master join tokens (one for each additional master)
       shell: /snap/bin/microk8s add-node --token-ttl -1
       when: inventory_hostname == primary_master
-      register: master_join_command
+      loop: "{{ groups['masters'] | difference([primary_master]) }}"
+      loop_control:
+        loop_var: master_node
+      register: master_join_outputs
       changed_when: false
       tags: cluster
 
-    - name: Display master join token generation
-      debug:
-        var: master_join_command
+    - name: Extract join token for each master
       when: inventory_hostname == primary_master
-      tags: cluster
-
-    - name: Extract master join command
       set_fact:
-        master_join_token: "{{ master_join_command.stdout_lines | select('match', '.*microk8s join.*') | reject('match', '.*--worker.*') | first | default('') }}"
-      when: 
-        - inventory_hostname == primary_master
-        - master_join_command.stdout_lines is defined
+        master_join_map: >-
+          {{
+            dict(
+              (item.master_node,
+               (item.stdout_lines
+                 | select('match', '.*microk8s join.*')
+                 | reject('match', '.*--worker.*')
+                 | first))
+              for item in master_join_outputs.results
+            )
+          }}
       tags: cluster
 
-    - name: Display extracted master join token
+    - name: Display per-master join token map
       debug:
-        var: master_join_token
+        var: master_join_map
       when: inventory_hostname == primary_master
       tags: cluster
 
-    - name: Fail if master join token is empty
-      fail:
-        msg: "Failed to extract master join token from add-node output"
-      when: 
-        - inventory_hostname == primary_master
-        - master_join_token is not defined or master_join_token == ''
-      tags: cluster
-
-    - name: Generate join token for workers from primary master
+    # Worker tokens: one per worker
+    - name: Generate per-worker join tokens
       shell: /snap/bin/microk8s add-node --token-ttl -1
       when: inventory_hostname == primary_master
-      register: worker_join_command
+      loop: "{{ groups['workers'] }}"
+      loop_control:
+        loop_var: worker_node
+      register: worker_join_outputs
       changed_when: false
       tags: cluster
 
-    - name: Display worker join token generation
+    - name: Extract worker join tokens with --worker flag
+      when: inventory_hostname == primary_master
+      set_fact:
+        worker_join_map: >-
+          {{
+            dict(
+              (item.worker_node,
+               (item.stdout_lines
+                 | select('match', '.*microk8s join.*--worker')
+                 | first))
+              for item in worker_join_outputs.results
+            )
+          }}
+      tags: cluster
+
+    - name: Display per-worker join token map
       debug:
-        var: worker_join_command
+        var: worker_join_map
       when: inventory_hostname == primary_master
       tags: cluster
 
-    - name: Extract worker join command with --worker flag
+    ###########################################################################
+    # PHASE 5 — Join additional masters (each uses its own token)
+    ###########################################################################
+
+    - name: Store master join token (per-node)
       set_fact:
-        worker_join_token: "{{ worker_join_command.stdout_lines | select('match', '.*microk8s join.*--worker') | first | default('') }}"
-      when: 
-        - inventory_hostname == primary_master
-        - worker_join_command.stdout_lines is defined
-      tags: cluster
-
-    - name: Fail if worker join token is empty
-      fail:
-        msg: "Failed to extract worker join token from add-node output"
-      when: 
-        - inventory_hostname == primary_master
-        - worker_join_token is not defined or worker_join_token == ''
-      tags: cluster
-
-    - name: Display extracted worker join token
-      debug:
-        var: worker_join_token
-      when: inventory_hostname == primary_master
-      tags: cluster
-
-    # Phase 5: Join additional masters
-    - name: Store master join token
-      set_fact:
-        master_token: "{{ hostvars[primary_master]['master_join_token'] }}"
-      when: 
+        master_token: "{{ hostvars[primary_master]['master_join_map'][inventory_hostname] }}"
+      when:
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
       tags: cluster
@@ -305,14 +306,14 @@
     - name: Display master join command that will be executed
       debug:
         msg: "Joining master node {{ inventory_hostname }} to cluster with command:\n{{ master_token | replace('microk8s', '/snap/bin/microk8s') }}"
-      when: 
+      when:
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
       tags: cluster
 
     - name: Join additional master nodes to cluster
       shell: "{{ master_token | replace('microk8s', '/snap/bin/microk8s') }}"
-      when: 
+      when:
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
       register: master_join_result
@@ -332,14 +333,14 @@
           Error output:
           {{ master_join_result.stderr }}
           {% endif %}
-      when: 
+      when:
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
       tags: cluster
 
     - name: Wait for additional masters to be ready
       shell: /snap/bin/microk8s status --wait-ready
-      when: 
+      when:
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
       changed_when: false
@@ -353,10 +354,13 @@
       changed_when: false
       tags: cluster
 
-    # Phase 6: Join worker nodes
-    - name: Store worker join token
+    ###########################################################################
+    # PHASE 6 — Join workers (each uses its own token)
+    ###########################################################################
+
+    - name: Store worker join token (per-node)
       set_fact:
-        worker_token: "{{ hostvars[primary_master]['worker_join_token'] }}"
+        worker_token: "{{ hostvars[primary_master]['worker_join_map'][inventory_hostname] }}"
       when: inventory_hostname in groups['workers']
       tags: cluster
 
