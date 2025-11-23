@@ -11,7 +11,7 @@
 
   tasks:
     # --------------------------------------------------------------------------
-    # 0. Bootstrap Python
+    # 0. Bootstrap Python if missing
     # --------------------------------------------------------------------------
     - name: Bootstrap Python if missing
       raw: |
@@ -41,6 +41,15 @@
           - apt-transport-https
         state: present
         update_cache: yes
+
+    # --------------------------------------------------------------------------
+    # Create /etc/rancher/rke2 directory on all hosts
+    # --------------------------------------------------------------------------
+    - name: Create RKE2 config directory
+      file:
+        path: /etc/rancher/rke2
+        state: directory
+        mode: "0755"
 
     # --------------------------------------------------------------------------
     # 2. Install RKE2
@@ -113,8 +122,13 @@
       when: inventory_hostname == master0
 
     # --------------------------------------------------------------------------
-    # 4. Share token with all nodes
+    # 4. Share token with all nodes (wait until cluster_token is available)
     # --------------------------------------------------------------------------
+    - name: Wait for master0 token to be available
+      wait_for:
+        timeout: 120
+      when: inventory_hostname != master0 and (hostvars[master0].cluster_token is not defined or hostvars[master0].cluster_token == '')
+
     - name: Share token to all hosts
       set_fact:
         shared_token: "{{ hostvars[master0].cluster_token }}"
@@ -122,6 +136,7 @@
 
     - debug:
         msg: "Node {{ inventory_hostname }} received token {{ shared_token }}"
+      when: shared_token is defined
 
     # --------------------------------------------------------------------------
     # 5. Configure remaining masters
