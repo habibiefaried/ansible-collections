@@ -138,12 +138,10 @@
       register: rke2_server_stat
 
     - name: Install rke2 server (if not installed)
-      shell: |
-        INSTALL_RKE2_TYPE=server INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh
-      args:
-        warn: false
-      when: not rke2_server_stat.stat.exists
-      register: rke2_server_install
+      command: "INSTALL_RKE2_VERSION={{ rke2_version }} sh /tmp/rke2-install.sh"
+      when: not rke2_installed.stat.exists
+      register: rke2_install_result
+
     - name: Debug server install result
       debug:
         var: rke2_server_install
