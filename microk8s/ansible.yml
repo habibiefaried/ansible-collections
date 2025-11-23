@@ -31,12 +31,28 @@
   
   tasks:
     # Phase 0: Bootstrap Python and gather facts
-    - name: Install Python3 (raw command, no Python required)
+    - name: Install Python3 and dependencies (raw command, no Python required)
       raw: |
-        if ! command -v python3 &> /dev/null; then
-          apt-get update && apt-get install -y python3 python3-apt
-        fi
+        apt-get update
+        apt-get install -y python3 python3-apt python3-pip
+        python3 -m pip install --upgrade pip setuptools
       changed_when: false
+      tags: bootstrap
+
+    - name: Wait for system to settle
+      raw: sleep 2
+      changed_when: false
+      tags: bootstrap
+
+    - name: Test Python availability
+      raw: python3 --version
+      register: python_version
+      changed_when: false
+      tags: bootstrap
+
+    - name: Display Python version
+      debug:
+        msg: "{{ python_version.stdout_lines }}"
       tags: bootstrap
 
     - name: Gather facts after Python installation
@@ -126,11 +142,29 @@
       tags: prepare
 
     # Phase 2: Install MicroK8s on all nodes
-    - name: Install MicroK8s
-      snap:
-        name: microk8s
-        classic: yes
-        channel: "{{ microk8s_channel }}"
+    - name: Remove existing MicroK8s installation
+      command: snap remove microk8s --purge
+      register: microk8s_remove
+      failed_when: false
+      changed_when: microk8s_remove.rc == 0
+      tags: install
+
+    - name: Wait for snap removal to complete
+      pause:
+        seconds: 10
+      tags: install
+
+    - name: Install MicroK8s using snap command
+      command: snap install microk8s --classic --channel={{ microk8s_channel }}
+      register: microk8s_install
+      retries: 3
+      delay: 10
+      until: microk8s_install.rc == 0
+      tags: install
+
+    - name: Wait for snap installation to complete
+      pause:
+        seconds: 10
       tags: install
 
     - name: Add user to microk8s group
