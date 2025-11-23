@@ -1,0 +1,1005 @@
+# time ansible-playbook -i inventory.ini ansible.yml --private-key ~/id_rsa_priv.key -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+
+PLAY [Deploy MicroK8s Cluster on Debian] *************************************************************************************************************************
+
+TASK [Install Python3 and dependencies (raw command, no Python required)] ****************************************************************************************
+ok: [master1]
+ok: [master2]
+ok: [master3]
+ok: [worker2]
+ok: [worker1]
+ok: [worker3]
+
+TASK [Wait for system to settle] *********************************************************************************************************************************
+ok: [master1]
+ok: [master2]
+ok: [master3]
+ok: [worker1]
+ok: [worker2]
+ok: [worker3]
+
+TASK [Gather facts after Python installation] ********************************************************************************************************************
+[WARNING]: Platform linux on host master1 is using the discovered Python interpreter at /usr/bin/python3, but future installation of another Python interpreter
+could change the meaning of that path. See https://docs.ansible.com/ansible-core/2.17/reference_appendices/interpreter_discovery.html for more information.
+ok: [master1]
+[WARNING]: Platform linux on host master3 is using the discovered Python interpreter at /usr/bin/python3, but future installation of another Python interpreter
+could change the meaning of that path. See https://docs.ansible.com/ansible-core/2.17/reference_appendices/interpreter_discovery.html for more information.
+ok: [master3]
+[WARNING]: Platform linux on host worker1 is using the discovered Python interpreter at /usr/bin/python3, but future installation of another Python interpreter
+could change the meaning of that path. See https://docs.ansible.com/ansible-core/2.17/reference_appendices/interpreter_discovery.html for more information.
+ok: [worker1]
+[WARNING]: Platform linux on host master2 is using the discovered Python interpreter at /usr/bin/python3, but future installation of another Python interpreter
+could change the meaning of that path. See https://docs.ansible.com/ansible-core/2.17/reference_appendices/interpreter_discovery.html for more information.
+ok: [master2]
+[WARNING]: Platform linux on host worker2 is using the discovered Python interpreter at /usr/bin/python3, but future installation of another Python interpreter
+could change the meaning of that path. See https://docs.ansible.com/ansible-core/2.17/reference_appendices/interpreter_discovery.html for more information.
+ok: [worker2]
+[WARNING]: Platform linux on host worker3 is using the discovered Python interpreter at /usr/bin/python3, but future installation of another Python interpreter
+could change the meaning of that path. See https://docs.ansible.com/ansible-core/2.17/reference_appendices/interpreter_discovery.html for more information.
+ok: [worker3]
+
+TASK [Update apt cache] ******************************************************************************************************************************************
+ok: [master1]
+ok: [master3]
+ok: [master2]
+ok: [worker1]
+ok: [worker2]
+ok: [worker3]
+
+TASK [Install Python3 and dependencies] **************************************************************************************************************************
+ok: [master1]
+ok: [master3]
+ok: [worker1]
+ok: [master2]
+ok: [worker2]
+ok: [worker3]
+
+TASK [Ensure snapd service is running] ***************************************************************************************************************************
+ok: [master1]
+ok: [master3]
+ok: [worker1]
+ok: [worker2]
+ok: [master2]
+ok: [worker3]
+
+TASK [Wait for snapd to be ready] ********************************************************************************************************************************
+ok: [worker2]
+ok: [master3]
+ok: [master1]
+ok: [worker1]
+ok: [master2]
+ok: [worker3]
+
+TASK [Disable UFW firewall] **************************************************************************************************************************************
+fatal: [master1]: FAILED! => {"changed": false, "msg": "Could not find the requested service ufw: host"}
+...ignoring
+fatal: [master3]: FAILED! => {"changed": false, "msg": "Could not find the requested service ufw: host"}
+...ignoring
+fatal: [worker1]: FAILED! => {"changed": false, "msg": "Could not find the requested service ufw: host"}
+...ignoring
+fatal: [master2]: FAILED! => {"changed": false, "msg": "Could not find the requested service ufw: host"}
+...ignoring
+fatal: [worker2]: FAILED! => {"changed": false, "msg": "Could not find the requested service ufw: host"}
+...ignoring
+fatal: [worker3]: FAILED! => {"changed": false, "msg": "Could not find the requested service ufw: host"}
+...ignoring
+
+TASK [Disable firewalld (if present)] ****************************************************************************************************************************
+fatal: [master1]: FAILED! => {"changed": false, "msg": "Could not find the requested service firewalld: host"}
+...ignoring
+fatal: [master3]: FAILED! => {"changed": false, "msg": "Could not find the requested service firewalld: host"}
+...ignoring
+fatal: [worker2]: FAILED! => {"changed": false, "msg": "Could not find the requested service firewalld: host"}
+...ignoring
+fatal: [master2]: FAILED! => {"changed": false, "msg": "Could not find the requested service firewalld: host"}
+...ignoring
+fatal: [worker1]: FAILED! => {"changed": false, "msg": "Could not find the requested service firewalld: host"}
+...ignoring
+fatal: [worker3]: FAILED! => {"changed": false, "msg": "Could not find the requested service firewalld: host"}
+...ignoring
+
+TASK [Enable IP forwarding] **************************************************************************************************************************************
+ok: [master2]
+ok: [worker1]
+ok: [worker2]
+ok: [master3]
+ok: [master1]
+ok: [worker3]
+
+TASK [Enable bridge netfilter] ***********************************************************************************************************************************
+ok: [master3]
+ok: [master1]
+ok: [worker1]
+ok: [master2]
+ok: [worker2]
+ok: [worker3]
+
+TASK [Make br_netfilter persistent] ******************************************************************************************************************************
+ok: [master1]
+ok: [master3]
+ok: [worker2]
+ok: [master2]
+ok: [worker1]
+ok: [worker3]
+
+TASK [Configure bridge networking] *******************************************************************************************************************************
+ok: [master1] => (item=net.bridge.bridge-nf-call-iptables)
+ok: [master3] => (item=net.bridge.bridge-nf-call-iptables)
+ok: [worker2] => (item=net.bridge.bridge-nf-call-iptables)
+ok: [master2] => (item=net.bridge.bridge-nf-call-iptables)
+ok: [worker1] => (item=net.bridge.bridge-nf-call-iptables)
+ok: [master1] => (item=net.bridge.bridge-nf-call-ip6tables)
+ok: [master3] => (item=net.bridge.bridge-nf-call-ip6tables)
+ok: [worker2] => (item=net.bridge.bridge-nf-call-ip6tables)
+ok: [worker1] => (item=net.bridge.bridge-nf-call-ip6tables)
+ok: [master2] => (item=net.bridge.bridge-nf-call-ip6tables)
+ok: [worker3] => (item=net.bridge.bridge-nf-call-iptables)
+ok: [worker3] => (item=net.bridge.bridge-nf-call-ip6tables)
+
+TASK [Remove existing MicroK8s installation] *********************************************************************************************************************
+changed: [master1]
+changed: [master3]
+changed: [master2]
+changed: [worker2]
+changed: [worker1]
+changed: [worker3]
+
+TASK [Display removal result] ************************************************************************************************************************************
+ok: [master1] => {
+    "microk8s_remove": {
+        "changed": true,
+        "cmd": [
+            "snap",
+            "remove",
+            "microk8s",
+            "--purge"
+        ],
+        "delta": "0:00:21.571453",
+        "end": "2025-11-23 07:59:16.036891",
+        "failed": false,
+        "failed_when_result": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:58:54.465438",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s removed",
+        "stdout_lines": [
+            "microk8s removed"
+        ]
+    }
+}
+ok: [master2] => {
+    "microk8s_remove": {
+        "changed": true,
+        "cmd": [
+            "snap",
+            "remove",
+            "microk8s",
+            "--purge"
+        ],
+        "delta": "0:00:22.124452",
+        "end": "2025-11-23 07:59:16.752524",
+        "failed": false,
+        "failed_when_result": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:58:54.628072",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s removed",
+        "stdout_lines": [
+            "microk8s removed"
+        ]
+    }
+}
+ok: [master3] => {
+    "microk8s_remove": {
+        "changed": true,
+        "cmd": [
+            "snap",
+            "remove",
+            "microk8s",
+            "--purge"
+        ],
+        "delta": "0:00:21.642601",
+        "end": "2025-11-23 07:59:16.196264",
+        "failed": false,
+        "failed_when_result": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:58:54.553663",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s removed",
+        "stdout_lines": [
+            "microk8s removed"
+        ]
+    }
+}
+ok: [worker1] => {
+    "microk8s_remove": {
+        "changed": true,
+        "cmd": [
+            "snap",
+            "remove",
+            "microk8s",
+            "--purge"
+        ],
+        "delta": "0:00:23.008488",
+        "end": "2025-11-23 07:59:17.665736",
+        "failed": false,
+        "failed_when_result": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:58:54.657248",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s removed",
+        "stdout_lines": [
+            "microk8s removed"
+        ]
+    }
+}
+ok: [worker2] => {
+    "microk8s_remove": {
+        "changed": true,
+        "cmd": [
+            "snap",
+            "remove",
+            "microk8s",
+            "--purge"
+        ],
+        "delta": "0:00:22.346356",
+        "end": "2025-11-23 07:59:17.010441",
+        "failed": false,
+        "failed_when_result": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:58:54.664085",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s removed",
+        "stdout_lines": [
+            "microk8s removed"
+        ]
+    }
+}
+ok: [worker3] => {
+    "microk8s_remove": {
+        "changed": true,
+        "cmd": [
+            "snap",
+            "remove",
+            "microk8s",
+            "--purge"
+        ],
+        "delta": "0:00:23.204496",
+        "end": "2025-11-23 07:59:40.423488",
+        "failed": false,
+        "failed_when_result": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:59:17.218992",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s removed",
+        "stdout_lines": [
+            "microk8s removed"
+        ]
+    }
+}
+
+TASK [Wait for snap removal to complete] *************************************************************************************************************************
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [master1]
+
+TASK [Install MicroK8s using snap command] ***********************************************************************************************************************
+changed: [master1]
+changed: [worker1]
+changed: [worker2]
+changed: [master3]
+changed: [master2]
+changed: [worker3]
+
+TASK [Display installation result] *******************************************************************************************************************************
+ok: [master1] => {
+    "microk8s_install": {
+        "attempts": 1,
+        "changed": true,
+        "cmd": [
+            "snap",
+            "install",
+            "microk8s",
+            "--classic",
+            "--channel=latest/stable"
+        ],
+        "delta": "0:00:17.916875",
+        "end": "2025-11-23 08:00:10.262455",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:59:52.345580",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s v1.34.1 from Canonical** installed",
+        "stdout_lines": [
+            "microk8s v1.34.1 from Canonical** installed"
+        ]
+    }
+}
+ok: [master2] => {
+    "microk8s_install": {
+        "attempts": 1,
+        "changed": true,
+        "cmd": [
+            "snap",
+            "install",
+            "microk8s",
+            "--classic",
+            "--channel=latest/stable"
+        ],
+        "delta": "0:00:32.401427",
+        "end": "2025-11-23 08:00:24.848503",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:59:52.447076",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s v1.34.1 from Canonical** installed",
+        "stdout_lines": [
+            "microk8s v1.34.1 from Canonical** installed"
+        ]
+    }
+}
+ok: [master3] => {
+    "microk8s_install": {
+        "attempts": 1,
+        "changed": true,
+        "cmd": [
+            "snap",
+            "install",
+            "microk8s",
+            "--classic",
+            "--channel=latest/stable"
+        ],
+        "delta": "0:00:29.867597",
+        "end": "2025-11-23 08:00:22.259098",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:59:52.391501",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s v1.34.1 from Canonical** installed",
+        "stdout_lines": [
+            "microk8s v1.34.1 from Canonical** installed"
+        ]
+    }
+}
+ok: [worker1] => {
+    "microk8s_install": {
+        "attempts": 1,
+        "changed": true,
+        "cmd": [
+            "snap",
+            "install",
+            "microk8s",
+            "--classic",
+            "--channel=latest/stable"
+        ],
+        "delta": "0:00:26.417560",
+        "end": "2025-11-23 08:00:18.960541",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:59:52.542981",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s v1.34.1 from Canonical** installed",
+        "stdout_lines": [
+            "microk8s v1.34.1 from Canonical** installed"
+        ]
+    }
+}
+ok: [worker2] => {
+    "microk8s_install": {
+        "attempts": 1,
+        "changed": true,
+        "cmd": [
+            "snap",
+            "install",
+            "microk8s",
+            "--classic",
+            "--channel=latest/stable"
+        ],
+        "delta": "0:00:27.116332",
+        "end": "2025-11-23 08:00:19.602099",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 07:59:52.485767",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s v1.34.1 from Canonical** installed",
+        "stdout_lines": [
+            "microk8s v1.34.1 from Canonical** installed"
+        ]
+    }
+}
+ok: [worker3] => {
+    "microk8s_install": {
+        "attempts": 1,
+        "changed": true,
+        "cmd": [
+            "snap",
+            "install",
+            "microk8s",
+            "--classic",
+            "--channel=latest/stable"
+        ],
+        "delta": "0:00:24.271126",
+        "end": "2025-11-23 08:00:35.824189",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 08:00:11.553063",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "microk8s v1.34.1 from Canonical** installed",
+        "stdout_lines": [
+            "microk8s v1.34.1 from Canonical** installed"
+        ]
+    }
+}
+
+TASK [Wait for snap installation to complete] ********************************************************************************************************************
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [master1]
+
+TASK [Add user to microk8s group] ********************************************************************************************************************************
+ok: [master1]
+ok: [worker1]
+ok: [master2]
+ok: [worker2]
+ok: [master3]
+ok: [worker3]
+
+TASK [Create .kube directory] ************************************************************************************************************************************
+ok: [master3]
+ok: [master1]
+ok: [worker1]
+ok: [worker2]
+ok: [master2]
+ok: [worker3]
+
+TASK [Wait for MicroK8s to be ready] *****************************************************************************************************************************
+ok: [master1]
+ok: [master2]
+ok: [master3]
+ok: [worker1]
+ok: [worker2]
+ok: [worker3]
+
+TASK [Enable MicroK8s addons on primary master] ******************************************************************************************************************
+skipping: [master2] => (item=dns)
+skipping: [master2] => (item=storage)
+skipping: [master3] => (item=dns)
+skipping: [master2] => (item=ingress)
+skipping: [master3] => (item=storage)
+skipping: [master3] => (item=ingress)
+skipping: [master2]
+skipping: [worker1] => (item=dns)
+skipping: [worker1] => (item=storage)
+skipping: [worker1] => (item=ingress)
+skipping: [worker2] => (item=dns)
+skipping: [master3]
+skipping: [worker2] => (item=storage)
+skipping: [worker1]
+skipping: [worker2] => (item=ingress)
+skipping: [worker2]
+skipping: [worker3] => (item=dns)
+skipping: [worker3] => (item=storage)
+skipping: [worker3] => (item=ingress)
+skipping: [worker3]
+ok: [master1] => (item=dns)
+changed: [master1] => (item=storage)
+changed: [master1] => (item=ingress)
+
+TASK [Display addon enablement results] **************************************************************************************************************************
+skipping: [master2]
+ok: [master1] => {
+    "enable_addons": {
+        "changed": true,
+        "msg": "All items completed",
+        "results": [
+            {
+                "ansible_loop_var": "item",
+                "changed": false,
+                "cmd": "/snap/bin/microk8s enable dns",
+                "delta": "0:00:00.634181",
+                "end": "2025-11-23 08:01:09.793924",
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "_raw_params": "/snap/bin/microk8s enable dns",
+                        "_uses_shell": true,
+                        "argv": null,
+                        "chdir": null,
+                        "creates": null,
+                        "executable": null,
+                        "expand_argument_vars": true,
+                        "removes": null,
+                        "stdin": null,
+                        "stdin_add_newline": true,
+                        "strip_empty_ends": true
+                    }
+                },
+                "item": "dns",
+                "msg": "",
+                "rc": 0,
+                "start": "2025-11-23 08:01:09.159743",
+                "stderr": "Infer repository core for addon dns",
+                "stderr_lines": [
+                    "Infer repository core for addon dns"
+                ],
+                "stdout": "Addon core/dns is already enabled",
+                "stdout_lines": [
+                    "Addon core/dns is already enabled"
+                ]
+            },
+            {
+                "ansible_loop_var": "item",
+                "changed": true,
+                "cmd": "/snap/bin/microk8s enable storage",
+                "delta": "0:00:01.858476",
+                "end": "2025-11-23 08:01:12.819629",
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "_raw_params": "/snap/bin/microk8s enable storage",
+                        "_uses_shell": true,
+                        "argv": null,
+                        "chdir": null,
+                        "creates": null,
+                        "executable": null,
+                        "expand_argument_vars": true,
+                        "removes": null,
+                        "stdin": null,
+                        "stdin_add_newline": true,
+                        "strip_empty_ends": true
+                    }
+                },
+                "item": "storage",
+                "msg": "",
+                "rc": 0,
+                "start": "2025-11-23 08:01:10.961153",
+                "stderr": "Infer repository core for addon storage\nInfer repository core for addon hostpath-storage",
+                "stderr_lines": [
+                    "Infer repository core for addon storage",
+                    "Infer repository core for addon hostpath-storage"
+                ],
+                "stdout": "DEPRECATION WARNING: 'storage' is deprecated and will soon be removed. Please use 'hostpath-storage' instead.\n\nEnabling default storage class.\nWARNING: Hostpath storage is not suitable for production environments.\n         A hostpath volume can grow beyond the size limit set in the volume claim manifest.\n\ndeployment.apps/hostpath-provisioner created\nstorageclass.storage.k8s.io/microk8s-hostpath created\nserviceaccount/microk8s-hostpath created\nclusterrole.rbac.authorization.k8s.io/microk8s-hostpath created\nclusterrolebinding.rbac.authorization.k8s.io/microk8s-hostpath created\nStorage will be available soon.",
+                "stdout_lines": [
+                    "DEPRECATION WARNING: 'storage' is deprecated and will soon be removed. Please use 'hostpath-storage' instead.",
+                    "",
+                    "Enabling default storage class.",
+                    "WARNING: Hostpath storage is not suitable for production environments.",
+                    "         A hostpath volume can grow beyond the size limit set in the volume claim manifest.",
+                    "",
+                    "deployment.apps/hostpath-provisioner created",
+                    "storageclass.storage.k8s.io/microk8s-hostpath created",
+                    "serviceaccount/microk8s-hostpath created",
+                    "clusterrole.rbac.authorization.k8s.io/microk8s-hostpath created",
+                    "clusterrolebinding.rbac.authorization.k8s.io/microk8s-hostpath created",
+                    "Storage will be available soon."
+                ]
+            },
+            {
+                "ansible_loop_var": "item",
+                "changed": true,
+                "cmd": "/snap/bin/microk8s enable ingress",
+                "delta": "0:00:01.442082",
+                "end": "2025-11-23 08:01:15.301384",
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "_raw_params": "/snap/bin/microk8s enable ingress",
+                        "_uses_shell": true,
+                        "argv": null,
+                        "chdir": null,
+                        "creates": null,
+                        "executable": null,
+                        "expand_argument_vars": true,
+                        "removes": null,
+                        "stdin": null,
+                        "stdin_add_newline": true,
+                        "strip_empty_ends": true
+                    }
+                },
+                "item": "ingress",
+                "msg": "",
+                "rc": 0,
+                "start": "2025-11-23 08:01:13.859302",
+                "stderr": "Infer repository core for addon ingress",
+                "stderr_lines": [
+                    "Infer repository core for addon ingress"
+                ],
+                "stdout": "Enabling Ingress\ningressclass.networking.k8s.io/public created\ningressclass.networking.k8s.io/nginx created\nnamespace/ingress created\nserviceaccount/nginx-ingress-microk8s-serviceaccount created\nclusterrole.rbac.authorization.k8s.io/nginx-ingress-microk8s-clusterrole created\nrole.rbac.authorization.k8s.io/nginx-ingress-microk8s-role created\nclusterrolebinding.rbac.authorization.k8s.io/nginx-ingress-microk8s created\nrolebinding.rbac.authorization.k8s.io/nginx-ingress-microk8s created\nconfigmap/nginx-load-balancer-microk8s-conf created\nconfigmap/nginx-ingress-tcp-microk8s-conf created\nconfigmap/nginx-ingress-udp-microk8s-conf created\ndaemonset.apps/nginx-ingress-microk8s-controller created\nIngress is enabled",
+                "stdout_lines": [
+                    "Enabling Ingress",
+                    "ingressclass.networking.k8s.io/public created",
+                    "ingressclass.networking.k8s.io/nginx created",
+                    "namespace/ingress created",
+                    "serviceaccount/nginx-ingress-microk8s-serviceaccount created",
+                    "clusterrole.rbac.authorization.k8s.io/nginx-ingress-microk8s-clusterrole created",
+                    "role.rbac.authorization.k8s.io/nginx-ingress-microk8s-role created",
+                    "clusterrolebinding.rbac.authorization.k8s.io/nginx-ingress-microk8s created",
+                    "rolebinding.rbac.authorization.k8s.io/nginx-ingress-microk8s created",
+                    "configmap/nginx-load-balancer-microk8s-conf created",
+                    "configmap/nginx-ingress-tcp-microk8s-conf created",
+                    "configmap/nginx-ingress-udp-microk8s-conf created",
+                    "daemonset.apps/nginx-ingress-microk8s-controller created",
+                    "Ingress is enabled"
+                ]
+            }
+        ],
+        "skipped": false
+    }
+}
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Enable HA clustering on primary master] ********************************************************************************************************************
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+ok: [master1]
+
+TASK [Display HA cluster enablement result] **********************************************************************************************************************
+ok: [master1] => {
+    "ha_enable": {
+        "changed": false,
+        "cmd": "/snap/bin/microk8s enable ha-cluster",
+        "delta": "0:00:00.647035",
+        "end": "2025-11-23 08:01:17.642186",
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "start": "2025-11-23 08:01:16.995151",
+        "stderr": "Infer repository core for addon ha-cluster",
+        "stderr_lines": [
+            "Infer repository core for addon ha-cluster"
+        ],
+        "stdout": "Addon core/ha-cluster is already enabled",
+        "stdout_lines": [
+            "Addon core/ha-cluster is already enabled"
+        ]
+    }
+}
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Wait for primary master to be ready] ***********************************************************************************************************************
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+ok: [master1]
+
+TASK [Generate per-master join tokens (one for each additional master)] ******************************************************************************************
+skipping: [master2] => (item=master3)
+skipping: [master2] => (item=master2)
+skipping: [master2]
+skipping: [master3] => (item=master3)
+skipping: [master3] => (item=master2)
+skipping: [master3]
+skipping: [worker1] => (item=master3)
+skipping: [worker1] => (item=master2)
+skipping: [worker2] => (item=master3)
+skipping: [worker1]
+skipping: [worker2] => (item=master2)
+skipping: [worker2]
+skipping: [worker3] => (item=master3)
+skipping: [worker3] => (item=master2)
+skipping: [worker3]
+ok: [master1] => (item=master3)
+ok: [master1] => (item=master2)
+
+TASK [Initialize empty master join map] **************************************************************************************************************************
+ok: [master1]
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Extract join token for each master] ************************************************************************************************************************
+skipping: [master2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master3', 'ansible_loop_var': 'master_node'})
+skipping: [master2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master2', 'ansible_loop_var': 'master_node'})
+skipping: [master3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master3', 'ansible_loop_var': 'master_node'})
+ok: [master1] => (item={'changed': False, 'stdout': "From the node you wish to join to this cluster, run the following:\nmicrok8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5\n\nUse the '--worker' flag to join a node as a worker not running the control plane, eg:\nmicrok8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5 --worker\n\nIf the node you are adding is not reachable through the default interface you can use one of the following:\nmicrok8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5", 'stderr': '', 'rc': 0, 'cmd': '/snap/bin/microk8s add-node --token-ttl -1', 'start': '2025-11-23 08:01:22.454718', 'end': '2025-11-23 08:01:23.094376', 'delta': '0:00:00.639658', 'msg': '', 'invocation': {'module_args': {'_raw_params': '/snap/bin/microk8s add-node --token-ttl -1', '_uses_shell': True, 'expand_argument_vars': True, 'stdin_add_newline': True, 'strip_empty_ends': True, 'argv': None, 'chdir': None, 'executable': None, 'creates': None, 'removes': None, 'stdin': None}}, 'stdout_lines': ['From the node you wish to join to this cluster, run the following:', 'microk8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5', '', "Use the '--worker' flag to join a node as a worker not running the control plane, eg:", 'microk8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5 --worker', '', 'If the node you are adding is not reachable through the default interface you can use one of the following:', 'microk8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5'], 'stderr_lines': [], 'failed': False, 'master_node': 'master3', 'ansible_loop_var': 'master_node'})
+skipping: [master3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master2', 'ansible_loop_var': 'master_node'})
+skipping: [master2]
+skipping: [worker1] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master3', 'ansible_loop_var': 'master_node'})
+ok: [master1] => (item={'changed': False, 'stdout': "From the node you wish to join to this cluster, run the following:\nmicrok8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5\n\nUse the '--worker' flag to join a node as a worker not running the control plane, eg:\nmicrok8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5 --worker\n\nIf the node you are adding is not reachable through the default interface you can use one of the following:\nmicrok8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5", 'stderr': '', 'rc': 0, 'cmd': '/snap/bin/microk8s add-node --token-ttl -1', 'start': '2025-11-23 08:01:24.240835', 'end': '2025-11-23 08:01:24.697553', 'delta': '0:00:00.456718', 'msg': '', 'invocation': {'module_args': {'_raw_params': '/snap/bin/microk8s add-node --token-ttl -1', '_uses_shell': True, 'expand_argument_vars': True, 'stdin_add_newline': True, 'strip_empty_ends': True, 'argv': None, 'chdir': None, 'executable': None, 'creates': None, 'removes': None, 'stdin': None}}, 'stdout_lines': ['From the node you wish to join to this cluster, run the following:', 'microk8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5', '', "Use the '--worker' flag to join a node as a worker not running the control plane, eg:", 'microk8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5 --worker', '', 'If the node you are adding is not reachable through the default interface you can use one of the following:', 'microk8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5'], 'stderr_lines': [], 'failed': False, 'master_node': 'master2', 'ansible_loop_var': 'master_node'})
+skipping: [worker1] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master2', 'ansible_loop_var': 'master_node'})
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master3', 'ansible_loop_var': 'master_node'})
+skipping: [worker2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master2', 'ansible_loop_var': 'master_node'})
+skipping: [worker2]
+skipping: [worker3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master3', 'ansible_loop_var': 'master_node'})
+skipping: [worker3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'master_node': 'master2', 'ansible_loop_var': 'master_node'})
+skipping: [worker3]
+
+TASK [Display per-master join token map] *************************************************************************************************************************
+ok: [master1] => {
+    "master_join_map": {
+        "master2": "microk8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5",
+        "master3": "microk8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5"
+    }
+}
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Generate per-worker join tokens] ***************************************************************************************************************************
+skipping: [master2] => (item=worker1)
+skipping: [master2] => (item=worker2)
+skipping: [master3] => (item=worker1)
+skipping: [master2] => (item=worker3)
+skipping: [master3] => (item=worker2)
+skipping: [master3] => (item=worker3)
+skipping: [worker1] => (item=worker1)
+skipping: [worker1] => (item=worker2)
+skipping: [worker1] => (item=worker3)
+skipping: [worker2] => (item=worker1)
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2] => (item=worker2)
+skipping: [worker2] => (item=worker3)
+skipping: [worker2]
+skipping: [worker3] => (item=worker1)
+skipping: [worker3] => (item=worker2)
+skipping: [worker3] => (item=worker3)
+skipping: [worker3]
+ok: [master1] => (item=worker1)
+ok: [master1] => (item=worker2)
+ok: [master1] => (item=worker3)
+
+TASK [Initialize empty worker join map] **************************************************************************************************************************
+ok: [master1]
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Extract worker join tokens with --worker flag] *************************************************************************************************************
+skipping: [master2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker1', 'ansible_loop_var': 'worker_node'})
+skipping: [master2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker2', 'ansible_loop_var': 'worker_node'})
+skipping: [master3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker1', 'ansible_loop_var': 'worker_node'})
+skipping: [master2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker3', 'ansible_loop_var': 'worker_node'})
+ok: [master1] => (item={'changed': False, 'stdout': "From the node you wish to join to this cluster, run the following:\nmicrok8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5\n\nUse the '--worker' flag to join a node as a worker not running the control plane, eg:\nmicrok8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5 --worker\n\nIf the node you are adding is not reachable through the default interface you can use one of the following:\nmicrok8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5", 'stderr': '', 'rc': 0, 'cmd': '/snap/bin/microk8s add-node --token-ttl -1', 'start': '2025-11-23 08:01:26.961965', 'end': '2025-11-23 08:01:27.518804', 'delta': '0:00:00.556839', 'msg': '', 'invocation': {'module_args': {'_raw_params': '/snap/bin/microk8s add-node --token-ttl -1', '_uses_shell': True, 'expand_argument_vars': True, 'stdin_add_newline': True, 'strip_empty_ends': True, 'argv': None, 'chdir': None, 'executable': None, 'creates': None, 'removes': None, 'stdin': None}}, 'stdout_lines': ['From the node you wish to join to this cluster, run the following:', 'microk8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5', '', "Use the '--worker' flag to join a node as a worker not running the control plane, eg:", 'microk8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5 --worker', '', 'If the node you are adding is not reachable through the default interface you can use one of the following:', 'microk8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5'], 'stderr_lines': [], 'failed': False, 'worker_node': 'worker1', 'ansible_loop_var': 'worker_node'})
+skipping: [master3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker2', 'ansible_loop_var': 'worker_node'})
+skipping: [master2]
+skipping: [master3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker3', 'ansible_loop_var': 'worker_node'})
+ok: [master1] => (item={'changed': False, 'stdout': "From the node you wish to join to this cluster, run the following:\nmicrok8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5\n\nUse the '--worker' flag to join a node as a worker not running the control plane, eg:\nmicrok8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5 --worker\n\nIf the node you are adding is not reachable through the default interface you can use one of the following:\nmicrok8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5", 'stderr': '', 'rc': 0, 'cmd': '/snap/bin/microk8s add-node --token-ttl -1', 'start': '2025-11-23 08:01:28.676155', 'end': '2025-11-23 08:01:29.045207', 'delta': '0:00:00.369052', 'msg': '', 'invocation': {'module_args': {'_raw_params': '/snap/bin/microk8s add-node --token-ttl -1', '_uses_shell': True, 'expand_argument_vars': True, 'stdin_add_newline': True, 'strip_empty_ends': True, 'argv': None, 'chdir': None, 'executable': None, 'creates': None, 'removes': None, 'stdin': None}}, 'stdout_lines': ['From the node you wish to join to this cluster, run the following:', 'microk8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5', '', "Use the '--worker' flag to join a node as a worker not running the control plane, eg:", 'microk8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5 --worker', '', 'If the node you are adding is not reachable through the default interface you can use one of the following:', 'microk8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5'], 'stderr_lines': [], 'failed': False, 'worker_node': 'worker2', 'ansible_loop_var': 'worker_node'})
+skipping: [master3]
+skipping: [worker1] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker1', 'ansible_loop_var': 'worker_node'})
+ok: [master1] => (item={'changed': False, 'stdout': "From the node you wish to join to this cluster, run the following:\nmicrok8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5\n\nUse the '--worker' flag to join a node as a worker not running the control plane, eg:\nmicrok8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5 --worker\n\nIf the node you are adding is not reachable through the default interface you can use one of the following:\nmicrok8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5", 'stderr': '', 'rc': 0, 'cmd': '/snap/bin/microk8s add-node --token-ttl -1', 'start': '2025-11-23 08:01:30.086164', 'end': '2025-11-23 08:01:30.473374', 'delta': '0:00:00.387210', 'msg': '', 'invocation': {'module_args': {'_raw_params': '/snap/bin/microk8s add-node --token-ttl -1', '_uses_shell': True, 'expand_argument_vars': True, 'stdin_add_newline': True, 'strip_empty_ends': True, 'argv': None, 'chdir': None, 'executable': None, 'creates': None, 'removes': None, 'stdin': None}}, 'stdout_lines': ['From the node you wish to join to this cluster, run the following:', 'microk8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5', '', "Use the '--worker' flag to join a node as a worker not running the control plane, eg:", 'microk8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5 --worker', '', 'If the node you are adding is not reachable through the default interface you can use one of the following:', 'microk8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5'], 'stderr_lines': [], 'failed': False, 'worker_node': 'worker3', 'ansible_loop_var': 'worker_node'})
+skipping: [worker1] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker2', 'ansible_loop_var': 'worker_node'})
+skipping: [worker1] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker3', 'ansible_loop_var': 'worker_node'})
+skipping: [worker2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker1', 'ansible_loop_var': 'worker_node'})
+skipping: [worker2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker2', 'ansible_loop_var': 'worker_node'})
+skipping: [worker1]
+skipping: [worker2] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker3', 'ansible_loop_var': 'worker_node'})
+skipping: [worker3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker1', 'ansible_loop_var': 'worker_node'})
+skipping: [worker2]
+skipping: [worker3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker2', 'ansible_loop_var': 'worker_node'})
+skipping: [worker3] => (item={'changed': False, 'skipped': True, 'skip_reason': 'Conditional result was False', 'false_condition': 'inventory_hostname == primary_master', 'worker_node': 'worker3', 'ansible_loop_var': 'worker_node'})
+skipping: [worker3]
+
+TASK [Display per-worker join token map] *************************************************************************************************************************
+ok: [master1] => {
+    "worker_join_map": {
+        "worker1": "microk8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5 --worker",
+        "worker2": "microk8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5 --worker",
+        "worker3": "microk8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5 --worker"
+    }
+}
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Store master join token (per-node)] ************************************************************************************************************************
+skipping: [master1]
+ok: [master2]
+skipping: [worker1]
+ok: [master3]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Display master join command that will be executed] *********************************************************************************************************
+skipping: [master1]
+ok: [master2] => {
+    "msg": "Joining master node master2 to cluster with command:\n/snap/bin/microk8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5"
+}
+skipping: [worker1]
+ok: [master3] => {
+    "msg": "Joining master node master3 to cluster with command:\n/snap/bin/microk8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5"
+}
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Join additional master nodes to cluster] *******************************************************************************************************************
+skipping: [master1]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+changed: [master3]
+changed: [master2]
+
+TASK [Display master join command output] ************************************************************************************************************************
+skipping: [master1]
+ok: [master2] => {
+    "msg": "Master node master2 join result:\nCommand: /snap/bin/microk8s join 172.31.27.182:25000/78001a8595934b2623d3e8473bb367b3/f3ca387ba7c5\nReturn code: 0\nOutput:\nContacting cluster at 172.31.27.182\nWaiting for this node to finish joining the cluster. .. .. .. ..  \nSuccessfully joined the cluster.\n"
+}
+ok: [master3] => {
+    "msg": "Master node master3 join result:\nCommand: /snap/bin/microk8s join 172.31.27.182:25000/3ec1668de323361b45c805c367f1a055/f3ca387ba7c5\nReturn code: 0\nOutput:\nContacting cluster at 172.31.27.182\nWaiting for this node to finish joining the cluster. .. .. .. ..  \nSuccessfully joined the cluster.\n"
+}
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Wait for additional masters to be ready] *******************************************************************************************************************
+skipping: [master1]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+ok: [master2]
+ok: [master3]
+
+TASK [Wait for all masters to stabilize on primary master] *******************************************************************************************************
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+ok: [master1]
+
+TASK [Store worker join token (per-node)] ************************************************************************************************************************
+skipping: [master1]
+skipping: [master2]
+skipping: [master3]
+ok: [worker1]
+ok: [worker2]
+ok: [worker3]
+
+TASK [Display worker join command that will be executed] *********************************************************************************************************
+skipping: [master1]
+skipping: [master2]
+skipping: [master3]
+ok: [worker1] => {
+    "msg": "Joining worker node worker1 to cluster with command:\n/snap/bin/microk8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5 --worker"
+}
+ok: [worker2] => {
+    "msg": "Joining worker node worker2 to cluster with command:\n/snap/bin/microk8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5 --worker"
+}
+ok: [worker3] => {
+    "msg": "Joining worker node worker3 to cluster with command:\n/snap/bin/microk8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5 --worker"
+}
+
+TASK [Join worker nodes to cluster] ******************************************************************************************************************************
+skipping: [master1]
+skipping: [master2]
+skipping: [master3]
+changed: [worker1]
+changed: [worker3]
+changed: [worker2]
+
+TASK [Display worker join command output] ************************************************************************************************************************
+skipping: [master1]
+skipping: [master2]
+skipping: [master3]
+ok: [worker1] => {
+    "msg": "Worker node worker1 join result:\nCommand: /snap/bin/microk8s join 172.31.27.182:25000/9356610f3bf7f5e4891fd8e2c7484a17/f3ca387ba7c5 --worker\nReturn code: 0\nOutput:\nContacting cluster at 172.31.27.182\n\nThe node has joined the cluster and will appear in the nodes list in a few seconds.\n\nThis worker node gets automatically configured with the API server endpoints.\nIf the API servers are behind a loadbalancer please set the '--refresh-interval' to '0s' in:\n    /var/snap/microk8s/current/args/apiserver-proxy\nand replace the API server endpoints with the one provided by the loadbalancer in:\n    /var/snap/microk8s/current/args/traefik/provider.yaml\n\nSuccessfully joined the cluster.\n"
+}
+ok: [worker2] => {
+    "msg": "Worker node worker2 join result:\nCommand: /snap/bin/microk8s join 172.31.27.182:25000/451d0be94103b3e5520d23254d1db2b3/f3ca387ba7c5 --worker\nReturn code: 0\nOutput:\nContacting cluster at 172.31.27.182\n\nThe node has joined the cluster and will appear in the nodes list in a few seconds.\n\nThis worker node gets automatically configured with the API server endpoints.\nIf the API servers are behind a loadbalancer please set the '--refresh-interval' to '0s' in:\n    /var/snap/microk8s/current/args/apiserver-proxy\nand replace the API server endpoints with the one provided by the loadbalancer in:\n    /var/snap/microk8s/current/args/traefik/provider.yaml\n\nSuccessfully joined the cluster.\n"
+}
+ok: [worker3] => {
+    "msg": "Worker node worker3 join result:\nCommand: /snap/bin/microk8s join 172.31.27.182:25000/1b7dff5a221075b16f4ff61b9cf82039/f3ca387ba7c5 --worker\nReturn code: 0\nOutput:\nContacting cluster at 172.31.27.182\n\nThe node has joined the cluster and will appear in the nodes list in a few seconds.\n\nThis worker node gets automatically configured with the API server endpoints.\nIf the API servers are behind a loadbalancer please set the '--refresh-interval' to '0s' in:\n    /var/snap/microk8s/current/args/apiserver-proxy\nand replace the API server endpoints with the one provided by the loadbalancer in:\n    /var/snap/microk8s/current/args/traefik/provider.yaml\n\nSuccessfully joined the cluster.\n"
+}
+
+TASK [Wait for worker nodes to be ready] *************************************************************************************************************************
+skipping: [master1]
+skipping: [master2]
+skipping: [master3]
+ok: [worker2]
+ok: [worker1]
+ok: [worker3]
+
+TASK [Generate kubeconfig on primary master] *********************************************************************************************************************
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+changed: [master1]
+
+TASK [Set kubeconfig permissions] ********************************************************************************************************************************
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+ok: [master1]
+
+TASK [Create kubectl alias] **************************************************************************************************************************************
+ok: [master1]
+ok: [worker1]
+ok: [master2]
+ok: [worker2]
+ok: [master3]
+ok: [worker3]
+
+TASK [Get cluster nodes] *****************************************************************************************************************************************
+skipping: [master2]
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+ok: [master1]
+
+TASK [Display cluster status] ************************************************************************************************************************************
+skipping: [master2]
+ok: [master1] => {
+    "msg": "Cluster nodes:\nNAME               STATUS   ROLES    AGE     VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION              CONTAINER-RUNTIME\nip-172-31-18-172   Ready    <none>   10s     v1.34.1   172.31.18.172   <none>        Debian GNU/Linux 13 (trixie)   6.12.48+deb13-cloud-amd64   containerd://1.7.28\nip-172-31-18-2     Ready    <none>   9s      v1.34.1   172.31.18.2     <none>        Debian GNU/Linux 13 (trixie)   6.12.48+deb13-cloud-amd64   containerd://1.7.28\nip-172-31-20-58    Ready    <none>   56s     v1.34.1   172.31.20.58    <none>        Debian GNU/Linux 13 (trixie)   6.12.48+deb13-cloud-amd64   containerd://1.7.28\nip-172-31-23-211   Ready    <none>   9s      v1.34.1   172.31.23.211   <none>        Debian GNU/Linux 13 (trixie)   6.12.48+deb13-cloud-amd64   containerd://1.7.28\nip-172-31-27-182   Ready    <none>   3m24s   v1.34.1   172.31.27.182   <none>        Debian GNU/Linux 13 (trixie)   6.12.48+deb13-cloud-amd64   containerd://1.7.28\nip-172-31-30-156   Ready    <none>   55s     v1.34.1   172.31.30.156   <none>        Debian GNU/Linux 13 (trixie)   6.12.48+deb13-cloud-amd64   containerd://1.7.28"
+}
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+TASK [Verify expected number of nodes] ***************************************************************************************************************************
+skipping: [master2]
+ok: [master1] => {
+    "changed": false,
+    "msg": "Cluster has correct number of nodes"
+}
+skipping: [master3]
+skipping: [worker1]
+skipping: [worker2]
+skipping: [worker3]
+
+PLAY RECAP *******************************************************************************************************************************************************
+master1                    : ok=42   changed=4    unreachable=0    failed=0    skipped=10   rescued=0    ignored=2
+master2                    : ok=26   changed=3    unreachable=0    failed=0    skipped=24   rescued=0    ignored=2
+master3                    : ok=26   changed=3    unreachable=0    failed=0    skipped=24   rescued=0    ignored=2
+worker1                    : ok=26   changed=3    unreachable=0    failed=0    skipped=24   rescued=0    ignored=2
+worker2                    : ok=26   changed=3    unreachable=0    failed=0    skipped=24   rescued=0    ignored=2
+worker3                    : ok=26   changed=3    unreachable=0    failed=0    skipped=24   rescued=0    ignored=2
+
+
+real    5m46.618s
+user    0m57.139s
+sys     0m34.871s
+root@vmi905529:~/ansible-collections/microk8s#
