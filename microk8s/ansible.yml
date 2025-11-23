@@ -137,6 +137,11 @@
       changed_when: microk8s_remove.rc == 0
       tags: install
 
+    - name: Display removal result
+      debug:
+        var: microk8s_remove
+      tags: install
+
     - name: Wait for snap removal to complete
       pause:
         seconds: 10
@@ -148,6 +153,11 @@
       retries: 3
       delay: 10
       until: microk8s_install.rc == 0
+      tags: install
+
+    - name: Display installation result
+      debug:
+        var: microk8s_install
       tags: install
 
     - name: Wait for snap installation to complete
@@ -187,11 +197,23 @@
       changed_when: "'Enabling' in enable_addons.stdout"
       tags: configure
 
+    - name: Display addon enablement results
+      debug:
+        var: enable_addons
+      when: inventory_hostname == primary_master
+      tags: configure
+
     - name: Enable HA clustering on primary master
       shell: /snap/bin/microk8s enable ha-cluster
       when: inventory_hostname == primary_master
       register: ha_enable
       changed_when: "'Enabling' in ha_enable.stdout"
+      tags: configure
+
+    - name: Display HA cluster enablement result
+      debug:
+        var: ha_enable
+      when: inventory_hostname == primary_master
       tags: configure
 
     - name: Wait for primary master to be ready
@@ -208,9 +230,21 @@
       changed_when: false
       tags: cluster
 
+    - name: Display master join token generation
+      debug:
+        var: master_join_command
+      when: inventory_hostname == primary_master
+      tags: cluster
+
     - name: Extract master join command
       set_fact:
         master_join_token: "{{ master_join_command.stdout_lines | select('match', '.*microk8s join.*') | first }}"
+      when: inventory_hostname == primary_master
+      tags: cluster
+
+    - name: Display extracted master join token
+      debug:
+        var: master_join_token
       when: inventory_hostname == primary_master
       tags: cluster
 
