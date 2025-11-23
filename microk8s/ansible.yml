@@ -172,7 +172,7 @@
       tags: install
 
     - name: Wait for MicroK8s to be ready
-      command: microk8s status --wait-ready
+      shell: /snap/bin/microk8s status --wait-ready
       changed_when: false
       retries: 10
       delay: 10
@@ -180,7 +180,7 @@
 
     # Phase 3: Configure primary master
     - name: Enable MicroK8s addons on primary master
-      command: "microk8s enable {{ item }}"
+      shell: "/snap/bin/microk8s enable {{ item }}"
       loop: "{{ microk8s_plugins }}"
       when: inventory_hostname == primary_master
       register: enable_addons
@@ -188,21 +188,21 @@
       tags: configure
 
     - name: Enable HA clustering on primary master
-      command: microk8s enable ha-cluster
+      shell: /snap/bin/microk8s enable ha-cluster
       when: inventory_hostname == primary_master
       register: ha_enable
       changed_when: "'Enabling' in ha_enable.stdout"
       tags: configure
 
     - name: Wait for primary master to be ready
-      command: microk8s status --wait-ready
+      shell: /snap/bin/microk8s status --wait-ready
       when: inventory_hostname == primary_master
       changed_when: false
       tags: configure
 
     # Phase 4: Generate join tokens
     - name: Generate join token for additional masters
-      command: microk8s add-node --token-ttl -1
+      shell: /snap/bin/microk8s add-node --token-ttl -1
       when: inventory_hostname == primary_master
       register: master_join_command
       changed_when: false
@@ -215,7 +215,7 @@
       tags: cluster
 
     - name: Generate join token for workers
-      command: microk8s add-node --token-ttl -1 --worker
+      shell: /snap/bin/microk8s add-node --token-ttl -1 --worker
       when: inventory_hostname == primary_master
       register: worker_join_command
       changed_when: false
@@ -247,7 +247,7 @@
       tags: cluster
 
     - name: Wait for additional masters to be ready
-      command: microk8s status --wait-ready
+      shell: /snap/bin/microk8s status --wait-ready
       when: 
         - inventory_hostname in groups['masters']
         - inventory_hostname != primary_master
@@ -262,7 +262,7 @@
       tags: cluster
 
     - name: Join worker nodes to cluster
-      command: "{{ worker_token }}"
+      shell: "{{ worker_token }}"
       when: inventory_hostname in groups['workers']
       register: worker_join_result
       changed_when: "'Successfully joined' in worker_join_result.stdout or worker_join_result.rc == 0"
@@ -270,14 +270,14 @@
       tags: cluster
 
     - name: Wait for worker nodes to be ready
-      command: microk8s status --wait-ready
+      shell: /snap/bin/microk8s status --wait-ready
       when: inventory_hostname in groups['workers']
       changed_when: false
       tags: cluster
 
     # Phase 7: Configure kubectl access
     - name: Generate kubeconfig on primary master
-      shell: microk8s config > /home/{{ ansible_user }}/.kube/config
+      shell: /snap/bin/microk8s config > /home/{{ ansible_user }}/.kube/config
       when: inventory_hostname == primary_master
       tags: config
 
