@@ -1,7 +1,25 @@
+---
+# inventory.ini
+# Save this as inventory.ini in the same directory
+#
+# [masters]
+# master1 ansible_host=192.168.1.10 ansible_user=ubuntu
+# master2 ansible_host=192.168.1.11 ansible_user=ubuntu
+# master3 ansible_host=192.168.1.12 ansible_user=ubuntu
+#
+# [workers]
+# worker1 ansible_host=192.168.1.20 ansible_user=ubuntu
+# worker2 ansible_host=192.168.1.21 ansible_user=ubuntu
+# worker3 ansible_host=192.168.1.22 ansible_user=ubuntu
+#
+# [k8s_cluster:children]
+# masters
+# workers
+
 - name: Deploy MicroK8s Cluster on Debian
   hosts: k8s_cluster
   become: yes
-  gather_facts: yes
+  gather_facts: no
   
   vars:
     microk8s_channel: "latest/stable"
@@ -12,6 +30,19 @@
     primary_master: "{{ groups['masters'][0] }}"
   
   tasks:
+    # Phase 0: Bootstrap Python and gather facts
+    - name: Install Python3 (raw command, no Python required)
+      raw: |
+        if ! command -v python3 &> /dev/null; then
+          apt-get update && apt-get install -y python3 python3-apt
+        fi
+      changed_when: false
+      tags: bootstrap
+
+    - name: Gather facts after Python installation
+      setup:
+      tags: bootstrap
+
     # Phase 1: Prepare all nodes
     - name: Update apt cache
       apt:
@@ -41,6 +72,57 @@
     - name: Wait for snapd to be ready
       command: snap wait system seed.loaded
       changed_when: false
+      tags: prepare
+
+    # Disable firewall for MicroK8s
+    - name: Disable UFW firewall
+      systemd:
+        name: ufw
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+      tags: prepare
+
+    - name: Disable firewalld (if present)
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+      tags: prepare
+
+    - name: Enable IP forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+      tags: prepare
+
+    - name: Enable bridge netfilter
+      modprobe:
+        name: br_netfilter
+        state: present
+      tags: prepare
+
+    - name: Make br_netfilter persistent
+      lineinfile:
+        path: /etc/modules-load.d/k8s.conf
+        line: br_netfilter
+        create: yes
+      tags: prepare
+
+    - name: Configure bridge networking
+      sysctl:
+        name: "{{ item }}"
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+      loop:
+        - net.bridge.bridge-nf-call-iptables
+        - net.bridge.bridge-nf-call-ip6tables
       tags: prepare
 
     # Phase 2: Install MicroK8s on all nodes
