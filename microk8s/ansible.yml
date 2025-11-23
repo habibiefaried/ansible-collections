@@ -214,8 +214,8 @@
       when: inventory_hostname == primary_master
       tags: cluster
 
-    - name: Generate join token for workers
-      shell: /snap/bin/microk8s add-node --token-ttl -1 --worker
+    - name: Generate join token for workers from primary master
+      shell: /snap/bin/microk8s add-node --token-ttl -1
       when: inventory_hostname == primary_master
       register: worker_join_command
       changed_when: false
@@ -310,4 +310,3 @@
         var: cluster_nodes.stdout_lines
       when: inventory_hostname == primary_master
       tags: verify
-      
