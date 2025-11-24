@@ -2,4 +2,4 @@
 2. `time ansible-playbook -i inventory.ini ansible.yml --private-key ~/id_rsa_priv.key -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"`
 
 # Disclaimer
-Tested NOT WORKING on Ubuntu (latest) AWS with t3.small. Possible to upgrade to t3.medium/large and try again
+UNTESTED

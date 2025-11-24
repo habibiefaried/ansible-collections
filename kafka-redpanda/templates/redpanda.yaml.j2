@@ -1,0 +1,44 @@
+redpanda:
+  data_directory: /var/lib/redpanda/data
+  
+  # The internal RPC protocol for Redpanda nodes to talk to each other
+  rpc_server:
+    address: 0.0.0.0
+    port: 33145
+
+  # Kafka API (Client traffic)
+  kafka_api:
+    - address: 0.0.0.0
+      port: 9092
+
+  # The address clients (and other brokers) use to connect to this node.
+  # We use the ansible_host (IP) defined in inventory.
+  advertised_kafka_api:
+    - address: {{ ansible_host }}
+      port: 9092
+
+  # Admin API (for 'rpk' command)
+  admin:
+    - address: 0.0.0.0
+      port: 9644
+
+  {% if groups['redpanda_nodes'] | length > 1 %}
+  # Cluster Formation (Seeds)
+  seed_servers:
+    {% for host in groups['redpanda_nodes'] %}
+    {% if host != inventory_hostname %}
+    - host: {{ hostvars[host]['ansible_host'] }}
+      port: 33145
+    {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  {% if redpanda_mode == 'dev' %}
+  # Developer mode settings (unsafe for prod, good for weak hardware)
+  developer_mode: true
+  {% endif %}
+
+rpk:
+  # Tuning parameters (auto-tuning)
+  tune_network: true
+  tune_disk_scheduler: true
