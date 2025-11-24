@@ -186,6 +186,7 @@ kind: Service
 metadata:
   name: broker-1
 spec:
+  type: NodePort
   selector:
     app: broker-1
   ports:
@@ -252,6 +253,7 @@ kind: Service
 metadata:
   name: broker-2
 spec:
+  type: NodePort
   selector:
     app: broker-2
   ports:
@@ -318,6 +320,7 @@ kind: Service
 metadata:
   name: broker-3
 spec:
+  type: NodePort
   selector:
     app: broker-3
   ports:
