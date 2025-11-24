@@ -28,7 +28,7 @@ spec:
         app: controller-1
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "kubernetes.io/hostname=ip-172-31-22-54"
+        kubernetes.io/hostname: "ip-172-31-22-54"
       containers:
         - name: controller
           image: apache/kafka:4.1.1
@@ -208,7 +208,7 @@ spec:
         app: broker-1
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "kubernetes.io/hostname=ip-172-31-22-54"
+        kubernetes.io/hostname: "ip-172-31-22-54"
       containers:
         - name: broker
           image: apache/kafka:4.1.1
