@@ -28,7 +28,7 @@ spec:
         app: controller-1
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "node-a.example"
+        kubernetes.io/hostname: "kubernetes.io/hostname=ip-172-31-22-54"
       containers:
         - name: controller
           image: apache/kafka:4.1.1
@@ -88,7 +88,7 @@ spec:
         app: controller-2
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "node-b.example"
+        kubernetes.io/hostname: "ip-172-31-23-88"
       containers:
         - name: controller
           image: apache/kafka:4.1.1
@@ -148,7 +148,7 @@ spec:
         app: controller-3
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "node-c.example"
+        kubernetes.io/hostname: "ip-172-31-31-152"
       containers:
         - name: controller
           image: apache/kafka:4.1.1
@@ -208,7 +208,7 @@ spec:
         app: broker-1
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "node-a.example"
+        kubernetes.io/hostname: "kubernetes.io/hostname=ip-172-31-22-54"
       containers:
         - name: broker
           image: apache/kafka:4.1.1
@@ -274,7 +274,7 @@ spec:
         app: broker-2
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "node-b.example"
+        kubernetes.io/hostname: "ip-172-31-23-88"
       containers:
         - name: broker
           image: apache/kafka:4.1.1
@@ -340,7 +340,7 @@ spec:
         app: broker-3
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "node-c.example"
+        kubernetes.io/hostname: "ip-172-31-31-152"
       containers:
         - name: broker
           image: apache/kafka:4.1.1
