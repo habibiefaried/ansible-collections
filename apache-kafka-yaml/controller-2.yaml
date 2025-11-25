@@ -27,7 +27,7 @@ spec:
         app: controller-2
     spec:
       nodeSelector:
-        kubernetes.io/hostname: "ip-172-31-23-88"
+        kubernetes.io/hostname: "ip-172-31-22-254"
       containers:
         - name: controller
           image: apache/kafka:4.1.1
