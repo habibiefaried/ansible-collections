@@ -4,7 +4,6 @@ metadata:
   name: broker-3
   namespace: kafka-secure
 spec:
-  type: NodePort
   selector:
     app: broker-3
   ports:
