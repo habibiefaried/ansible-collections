@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
+sudo snap alias microk8s.kubectl kubectl
 set -euo pipefail
 
 # Usage: ./generate-kafka-tls.sh
@@ -30,11 +31,11 @@ cd "$OUTDIR"
 echo "==> Creating namespace $NAMESPACE"
 kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
+# Clean old broker-specific files ONLY
+rm -f broker-*.keystore.jks broker-*.truststore.jks broker-*.csr broker-*.crt
+
 echo "==> Generating CA key/cert"
 openssl req -new -x509 -days 3650 -nodes -subj "/CN=Kafka-CA" -out ca.crt -keyout ca.key
-
-# Clean old files
-rm -f *.keystore.jks *.truststore.jks *.csr *.crt
 
 for b in "${BROKERS[@]}"; do
   echo "==> Generating keystore for $b"
