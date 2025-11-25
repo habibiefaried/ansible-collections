@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller-1
+  namespace: kafka-secure
+spec:
+  selector:
+    app: controller-1
+  ports:
+    - port: 9093
+      targetPort: 9093
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-1
+  namespace: kafka-secure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controller-1
+  template:
+    metadata:
+      labels:
+        app: controller-1
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: "ip-172-31-22-54"
+      containers:
+        - name: controller
+          image: apache/kafka:4.1.1
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: "controller"
+            - name: KAFKA_LISTENERS
+              value: "CONTROLLER://:9093"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@controller-1:9093,2@controller-2:9093,3@controller-3:9093"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+      volumes:
+        - name: data
+          hostPath:
+            path: /data/kafka-new/controller-1
+            type: DirectoryOrCreate

@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller-3
+  namespace: kafka
+spec:
+  selector:
+    app: controller-3
+  ports:
+    - port: 9093
+      targetPort: 9093
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-3
+  namespace: kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controller-3
+  template:
+    metadata:
+      labels:
+        app: controller-3
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: "ip-172-31-31-152"
+      containers:
+        - name: controller
+          image: apache/kafka:4.1.1
+          env:
+            - name: KAFKA_NODE_ID
+              value: "3"
+            - name: KAFKA_PROCESS_ROLES
+              value: "controller"
+            - name: KAFKA_LISTENERS
+              value: "CONTROLLER://:9093"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@controller-1:9093,2@controller-2:9093,3@controller-3:9093"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+      volumes:
+        - name: data
+          hostPath:
+            path: /data/kafka/controller-3
+            type: DirectoryOrCreate

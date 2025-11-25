@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker-2
+  namespace: kafka-secure
+spec:
+  type: NodePort
+  selector:
+    app: broker-2
+  ports:
+    - name: plain
+      port: 9092
+      targetPort: 9092
+      nodePort: 30093
+    - name: sasl-ssl
+      port: 9094
+      targetPort: 9094
+      nodePort: 30095
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broker-2
+  namespace: kafka-secure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broker-2
+  template:
+    metadata:
+      labels:
+        app: broker-2
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: "ip-172-31-23-88"
+      containers:
+        - name: broker
+          image: apache/kafka:4.1.1
+          ports:
+            - containerPort: 9092
+            - containerPort: 9094
+          env:
+            - name: KAFKA_NODE_ID
+              value: "5"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://:19092,PLAINTEXT_HOST://:9092,SASL_SSL://:9094"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://broker-2:19092,PLAINTEXT_HOST://broker-2:9092,SASL_SSL://ip-172-31-23-88:30095"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,SASL_SSL:SASL_SSL"
+            - name: KAFKA_SASL_ENABLED_MECHANISMS
+              value: "SCRAM-SHA-256,SCRAM-SHA-512"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@controller-1:9093,2@controller-2:9093,3@controller-3:9093"
+
+            - name: KAFKA_OPTS
+              value: "-Djava.security.auth.login.config=/etc/kafka/secrets/jaas.conf"
+            - name: KAFKA_CFG_SSL_KEYSTORE_LOCATION
+              value: "/etc/kafka/secrets/broker-2.keystore.jks"
+            - name: KAFKA_CFG_SSL_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-tls-secret
+                  key: keystore.password
+            - name: KAFKA_CFG_SSL_KEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-tls-secret
+                  key: keystore.password
+            - name: KAFKA_CFG_SSL_TRUSTSTORE_LOCATION
+              value: "/etc/kafka/secrets/broker-2.truststore.jks"
+            - name: KAFKA_CFG_SSL_TRUSTSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-tls-secret
+                  key: truststore.password
+            - name: KAFKA_SUPER_USERS
+              value: "User:superadmin"
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+            - name: kafka-tls
+              mountPath: /etc/kafka/secrets
+              readOnly: true
+      volumes:
+        - name: data
+          hostPath:
+            path: /data/kafka-new/broker-2
+            type: DirectoryOrCreate
+        - name: kafka-tls
+          secret:
+            secretName: kafka-tls-secret
