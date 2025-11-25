@@ -58,7 +58,6 @@ spec:
               value: "CONTROLLER"
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
               value: "1@controller-1:9093,2@controller-2:9093,3@controller-3:9093"
-
             - name: KAFKA_OPTS
               value: "-Djava.security.auth.login.config=/etc/kafka/secrets/jaas.conf"
             - name: KAFKA_CFG_SSL_KEYSTORE_LOCATION
@@ -82,6 +81,27 @@ spec:
                   key: truststore.password
             - name: KAFKA_SUPER_USERS
               value: "User:superadmin"
+            - name: KAFKA_CFG_LISTENER_NAME_SASL_SSL_SASL_ENABLED_MECHANISMS
+              value: "SCRAM-SHA-512"
+            - name: KAFKA_CFG_LISTENER_NAME_SASL_SSL_SASL_MECHANISM
+              value: "SCRAM-SHA-512"
+            - name: KAFKA_CFG_LISTENER_NAME_SASL_SSL_SSL_KEYSTORE_LOCATION
+              value: "/etc/kafka/secrets/broker-3.keystore.jks"
+
+            - name: KAFKA_CFG_LISTENER_NAME_SASL_SSL_SSL_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-tls-secret
+                  key: keystore.password
+
+            - name: KAFKA_CFG_LISTENER_NAME_SASL_SSL_SSL_TRUSTSTORE_LOCATION
+              value: "/etc/kafka/secrets/broker-3.truststore.jks"
+
+            - name: KAFKA_CFG_LISTENER_NAME_SASL_SSL_SSL_TRUSTSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-tls-secret
+                  key: truststore.password
 
           volumeMounts:
             - name: data
