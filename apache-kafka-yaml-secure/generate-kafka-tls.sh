@@ -11,6 +11,7 @@ set -euo pipefail
 #  - creates a single Kubernetes secret kafka-tls-secret with each broker's keystore/truststore + ca
 #  - creates a secret kafka-superadmin-secret with username/password (used by brokers as a reference)
 #
+# install:  sudo apt install openjdk-21-jdk openssl -y
 # IMPORTANT: In production, use proper CA and stronger passwords. This script uses 'changeit' defaults.
 
 NAMESPACE="kafka-secure"

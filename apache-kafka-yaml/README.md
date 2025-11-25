@@ -17,7 +17,7 @@ admin@ip-172-31-40-76:~/kafka_2.13-4.1.1$ kubectl exec -it pod/broker-1-5b49cb85
 broker-1-5b49cb8578-nkjhr:/$ /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --list
 
 broker-1-5b49cb8578-nkjhr:/$ /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
+  --bootstrap-server 43.218.112.23:9092 \
   --create \
   --topic my-topic \
   --partitions 3 \
@@ -30,10 +30,22 @@ my-topic
 ## Caveats
 1. Cannot hit from outside because advertised address is internal domain (broker-1, broker-2, etc). unknown from outside
 
+Workaround
+
+set /etc/hosts to match with internal domain (see proof/workaround.png)
+
 ```
-admin@ip-172-31-40-76:~/kafka_2.13-4.1.1$ kubectl logs pod/broker-3-54d8c85b69-jpl88 | grep advertised
-        advertised.listeners = PLAINTEXT://broker-3:19092,PLAINTEXT_HOST://broker-3:9092
-        advertised.listeners = PLAINTEXT://broker-3:19092,PLAINTEXT_HOST://broker-3:9092
+# cat /etc/hosts | grep broker-
+43.218.112.23 broker-1
+16.78.84.239  broker-2
+16.79.125.96  broker-3
+
+# bin/kafka-topics.sh --bootstrap-server 43.218.112.23:9092 --list
+my-topic
 ```
 
-need to edit yaml so it will go to real IP and port running
+## cleanup
+
+```
+kubectl delete all --all -n kafka
+```
